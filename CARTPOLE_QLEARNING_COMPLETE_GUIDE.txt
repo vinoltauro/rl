@@ -1,0 +1,1081 @@
+CARTPOLE Q-LEARNING: COMPLETE GUIDE
+====================================
+
+Author: Vinol
+Date: November 2025
+Course: Scalable Computing - Trinity College Dublin
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+
+1. Introduction to Reinforcement Learning
+2. Q-Learning Algorithm
+3. CartPole Problem Overview
+4. Discretization Explained
+5. Implementation Details
+6. Hyperparameters and Their Effects
+7. Training Process
+8. Performance Analysis
+9. Common Issues and Solutions
+10. Key Takeaways
+11. References
+
+================================================================================
+1. INTRODUCTION TO REINFORCEMENT LEARNING
+================================================================================
+
+Reinforcement Learning (RL) is a type of machine learning where an agent learns
+to make decisions by interacting with an environment.
+
+Core Components:
+├─ Agent: The learner/decision maker (our Q-learning algorithm)
+├─ Environment: The world the agent interacts with (CartPole simulation)
+├─ State: Current situation/observation (cart position, pole angle, etc.)
+├─ Action: Decision the agent makes (push left or push right)
+├─ Reward: Feedback signal (1.0 for each step pole stays balanced)
+└─ Policy: Strategy that maps states to actions
+
+The Goal: Learn a policy that maximizes cumulative reward over time.
+
+Key Difference from Supervised Learning:
+• Supervised: Learn from labeled examples (input → correct output)
+• Reinforcement: Learn from trial and error (action → reward)
+
+Analogy: Learning to ride a bike
+• No one tells you exactly how to balance
+• You try different actions (lean left, pedal faster, etc.)
+• You learn from outcomes (stay upright = good, fall = bad)
+• Over time, you develop a strategy (policy) for staying balanced
+
+================================================================================
+2. Q-LEARNING ALGORITHM
+================================================================================
+
+Q-Learning is a model-free, value-based RL algorithm.
+
+The Q-Function:
+Q(s, a) = Expected total future reward for taking action 'a' in state 's'
+
+The Q-Table:
+A lookup table storing Q-values for all state-action pairs.
+Think of it as a "cheat sheet" that tells you how good each action is in 
+each situation.
+
+Example Q-Table (simplified):
+┌─────────────────┬──────────┬───────────┐
+│ State           │ Action 0 │ Action 1  │
+│                 │ (Left)   │ (Right)   │
+├─────────────────┼──────────┼───────────┤
+│ (3, 5, 7, 2)    │   15.3   │    8.2    │  ← Best action: Left
+│ (6, 4, 8, 9)    │    7.1   │   18.7    │  ← Best action: Right
+│ (2, 3, 5, 1)    │   12.4   │   11.9    │  ← Best action: Left
+└─────────────────┴──────────┴───────────┘
+
+The Q-Learning Update Rule (Bellman Equation):
+
+    Q(s,a) ← Q(s,a) + α[r + γ·max Q(s',a') - Q(s,a)]
+                       ↑  ↑   ↑       ↑         ↑
+                       │  │   │       │         │
+                       │  │   │       │         └─ Current Q-value
+                       │  │   │       └─────────── Best future Q-value
+                       │  │   └─────────────────── Discount factor (0.99)
+                       │  └─────────────────────── Immediate reward
+                       └────────────────────────── Learning rate (0.15)
+
+Breaking Down the Update Rule:
+
+1. Target Q-value = r + γ·max Q(s',a')
+   "What the Q-value SHOULD be based on this experience"
+
+2. TD Error = Target - Current
+   "How wrong was our estimate?"
+
+3. New Q = Old Q + α × TD_Error
+   "Update our estimate by a fraction of the error"
+
+Why This Works:
+• Initially, all Q-values are 0 (we know nothing)
+• As agent explores, it receives rewards
+• Q-values propagate backwards through state sequences
+• Over time, Q-values converge to true expected returns
+
+Bootstrapping:
+Q-learning uses its own estimates to improve itself. This is called
+bootstrapping. We update Q(s,a) using Q(s',a'), which itself is being updated!
+
+================================================================================
+3. CARTPOLE PROBLEM OVERVIEW
+================================================================================
+
+CartPole-v1 is a classic control problem from OpenAI Gymnasium.
+
+Physical Setup:
+┌─────────────────────────────────────┐
+│                  ║                  │
+│                  ║ ← Pole           │
+│                  ║                  │
+│            ┌─────┴─────┐            │
+│            │   Cart    │            │
+│  ═══════════════════════════════════│
+│        ← Track (4.8m each side) →   │
+└─────────────────────────────────────┘
+
+Objective:
+Keep the pole balanced upright by moving the cart left or right.
+
+State Space (4 continuous dimensions):
+┌────────────────────────┬──────────────┬─────────────┐
+│ Component              │ Range        │ Unit        │
+├────────────────────────┼──────────────┼─────────────┤
+│ Cart Position          │ [-4.8, 4.8]  │ meters      │
+│ Cart Velocity          │ [-∞, ∞]      │ m/s         │
+│ Pole Angle             │ [-24°, 24°]  │ radians     │
+│ Pole Angular Velocity  │ [-∞, ∞]      │ rad/s       │
+└────────────────────────┴──────────────┴─────────────┘
+
+Action Space (2 discrete actions):
+• Action 0: Push cart to the LEFT
+• Action 1: Push cart to the RIGHT
+
+Reward:
+• +1 for every timestep the pole remains upright
+• Episode ends when:
+  - Pole angle > ±12° (pole fell)
+  - Cart position > ±2.4m (cart went off track)
+  - 500 timesteps elapsed (maximum episode length)
+
+Success Criterion:
+"Solved" when average reward ≥ 195 over 100 consecutive episodes.
+
+Why CartPole is Challenging:
+1. Continuous state space (infinite possible states)
+2. Requires precise control (small angles matter)
+3. Delayed consequences (bad action → pole falls later)
+4. Non-linear dynamics (physics simulation)
+
+================================================================================
+4. DISCRETIZATION EXPLAINED
+================================================================================
+
+The Problem:
+Q-learning needs a Q-table, but CartPole has continuous states.
+• Cart position could be 1.234567... or 1.234568...
+• These are different states, but require the same action!
+• Infinite states → infinite Q-table → impossible
+
+The Solution: Discretization (Binning)
+
+Concept: Group similar continuous values into discrete buckets (bins).
+
+Example: Cart Position from -4.8 to 4.8 with 10 bins
+────────────────────────────────────────────────────────
+-4.8   -3.84   -2.88   -1.92   -0.96    0     0.96   1.92   2.88   3.84   4.8
+  │      │       │       │       │      │      │      │      │      │      │
+  └─Bin 0─┴─Bin 1─┴─Bin 2─┴─Bin 3─┴─Bin 4─┴─Bin 5─┴─Bin 6─┴─Bin 7─┴─Bin 8─┴─Bin 9─┘
+
+Mapping:
+• Cart at position 1.2m  → Bin 6
+• Cart at position 1.5m  → Bin 6  (same bin!)
+• Cart at position -3.0m → Bin 1
+
+Implementation in Code:
+
+n_bins = [8, 10, 20, 20]  # Bins for [position, velocity, angle, ang_velocity]
+
+state_bounds = [
+    [-2.4, 2.4],    # Cart position range
+    [-3, 3],        # Cart velocity range
+    [-0.3, 0.3],    # Pole angle range
+    [-3, 3]         # Pole angular velocity range
+]
+
+Total discrete states = 8 × 10 × 20 × 20 = 32,000 states
+
+Why Different Numbers of Bins?
+• Cart position (8 bins): Doesn't need high precision
+• Cart velocity (10 bins): Moderate precision
+• Pole angle (20 bins): HIGH precision needed! Small angle changes matter
+• Pole angular velocity (20 bins): HIGH precision needed!
+
+The Trade-off:
+More bins → Better precision → Larger Q-table → Slower learning
+Fewer bins → Worse precision → Smaller Q-table → Faster learning (but worse performance)
+
+Tighter Bounds:
+Instead of full CartPole range [-4.8, 4.8], we use [-2.4, 2.4] because:
+• Cart rarely goes beyond ±2.4m in practice
+• Focusing bins on "useful range" gives better resolution
+• Extreme values are less important for learning
+
+Visualization:
+
+Continuous State:              Discrete State:
+[1.234, -0.567, 0.089, 0.234]  →  (6, 4, 15, 13)
+[1.298, -0.523, 0.091, 0.241]  →  (6, 4, 15, 13)  (same!)
+[1.156, -0.601, 0.087, 0.229]  →  (6, 4, 15, 13)  (same!)
+
+All three continuous states map to the same discrete state, so agent treats
+them identically.
+
+================================================================================
+5. IMPLEMENTATION DETAILS
+================================================================================
+
+5.1 Environment Setup
+─────────────────────
+
+import gymnasium as gym
+env = gym.make('CartPole-v1')
+
+5.2 Discretization Functions
+────────────────────────────
+
+def create_bins(n_bins, state_bounds):
+    """Create bin edges for each state dimension"""
+    bins = []
+    for i in range(len(n_bins)):
+        bins.append(np.linspace(state_bounds[i][0], 
+                               state_bounds[i][1], 
+                               n_bins[i]))
+    return bins
+
+def discretize_state(state, bins):
+    """Convert continuous state to discrete state"""
+    discrete_state = []
+    for i in range(len(state)):
+        discrete_state.append(np.digitize(state[i], bins[i]) - 1)
+    return tuple(discrete_state)
+
+5.3 Q-Table Initialization
+──────────────────────────
+
+q_table_shape = [8, 10, 20, 20, 2]  # [state_dims..., n_actions]
+q_table = np.zeros(q_table_shape)
+
+The Q-table is a 5-dimensional array:
+• Dimensions 0-3: Discretized state components
+• Dimension 4: Action (0 or 1)
+
+Access: q_table[3, 5, 12, 8, 0] → Q-value for state (3,5,12,8) and action 0
+
+5.4 Action Selection (Epsilon-Greedy)
+─────────────────────────────────────
+
+def choose_action(state, epsilon):
+    if np.random.random() < epsilon:
+        return env.action_space.sample()  # Explore: random action
+    else:
+        return np.argmax(q_table[state])  # Exploit: best action
+
+Logic:
+• Generate random number in [0, 1)
+• If random < epsilon: explore (try random action)
+• Else: exploit (use best known action)
+
+Example:
+• epsilon = 0.3 → 30% exploration, 70% exploitation
+• epsilon = 0.01 → 1% exploration, 99% exploitation
+
+5.5 Q-Value Update
+──────────────────
+
+def update_q_table(state, action, reward, next_state, done):
+    current_q = q_table[state + (action,)]
+    max_next_q = 0 if done else np.max(q_table[next_state])
+    new_q = current_q + learning_rate * (
+        reward + discount_factor * max_next_q - current_q
+    )
+    q_table[state + (action,)] = new_q
+
+Step-by-step:
+1. Get current Q-value for (state, action)
+2. Calculate max Q-value for next state (or 0 if episode ended)
+3. Calculate target: reward + discount × max_next_Q
+4. Calculate error: target - current
+5. Update: current + learning_rate × error
+
+5.6 Training Loop
+─────────────────
+
+for episode in range(n_episodes):
+    state = env.reset()
+    state = discretize_state(state, bins)
+    
+    for step in range(max_steps):
+        action = choose_action(state, epsilon)
+        next_state, reward, done, _, _ = env.step(action)
+        next_state = discretize_state(next_state, bins)
+        
+        update_q_table(state, action, reward, next_state, done)
+        
+        state = next_state
+        
+        if done:
+            break
+    
+    epsilon = max(epsilon_min, epsilon * epsilon_decay)
+
+Flow:
+1. Start episode: reset environment
+2. While not done:
+   a. Choose action (epsilon-greedy)
+   b. Execute action in environment
+   c. Observe result (next state, reward, done)
+   d. Update Q-table
+   e. Move to next state
+3. Decay epsilon
+4. Repeat for next episode
+
+================================================================================
+6. HYPERPARAMETERS AND THEIR EFFECTS
+================================================================================
+
+6.1 Learning Rate (α - alpha)
+─────────────────────────────
+
+Value: 0.15 (we use 0.10-0.20 typically)
+
+Effect: Controls how much to update Q-values based on new experiences
+
+Q_new = Q_old + α × (target - Q_old)
+
+• α = 0.0: Never learn (Q-values never change)
+• α = 0.01: Very slow learning, very stable
+• α = 0.15: Moderate learning speed (GOOD for CartPole)
+• α = 0.5: Fast learning, less stable
+• α = 1.0: Replace old value completely with new experience
+
+Intuition:
+Think of learning rate as "how much do you trust new information vs. your
+accumulated experience?"
+
+Low α: "I've seen this situation 100 times, one new experience won't 
+        change my mind much"
+High α: "This new experience is very important, let me adjust my belief 
+         significantly"
+
+6.2 Discount Factor (γ - gamma)
+───────────────────────────────
+
+Value: 0.99 (we use 0.95-0.99 typically)
+
+Effect: How much to value future rewards vs. immediate rewards
+
+target = reward + γ × max_future_Q
+
+• γ = 0.0: Only care about immediate reward (myopic)
+• γ = 0.5: Future rewards worth 50% of immediate
+• γ = 0.99: Future rewards almost as important as immediate (far-sighted)
+• γ = 1.0: Future rewards equally important (no discounting)
+
+Intuition:
+"Would you prefer $10 now or $15 in a year?"
+
+γ = 0: Always take $10 now
+γ = 0.99: Prefer $15 later (patient, long-term thinking)
+
+For CartPole:
+• High γ (0.99) is good because we want the agent to plan ahead
+• Taking action now affects pole angle later
+• Need to think multiple steps ahead
+
+6.3 Epsilon (ε) - Exploration Rate
+───────────────────────────────────
+
+Initial: 1.0 (100% exploration)
+Decay: 0.9995 per episode
+Minimum: 0.01 (1% exploration)
+
+Effect: Balance between exploration and exploitation
+
+Evolution:
+Episode 1:    ε = 1.000  → 100% random (pure exploration)
+Episode 100:  ε = 0.951  → 95% random
+Episode 500:  ε = 0.779  → 78% random
+Episode 1000: ε = 0.607  → 61% random
+Episode 2000: ε = 0.368  → 37% random
+Episode 5000: ε = 0.082  → 8% random
+Episode 10000: ε = 0.01  → 1% random (mostly exploitation)
+
+Why Decay?
+Early: Don't know anything → need to explore
+Middle: Learning good strategies → start exploiting
+Late: Have good policy → mostly exploit, occasionally explore
+
+Decay Rate Impact:
+• Fast decay (0.99): Quickly commit to early findings (might miss better strategies)
+• Slow decay (0.9995): Explore longer (more robust, but slower convergence)
+• No decay: Never exploit learned knowledge (bad!)
+
+6.4 Number of Episodes
+───────────────────────
+
+Value: 15,000 (with early stopping)
+
+Why So Many?
+• Each episode provides limited information
+• Need many experiences to fill Q-table accurately
+• 32,000 states × 2 actions = 64,000 Q-values to learn!
+
+Early Stopping:
+Instead of running all 15,000 episodes, we stop when solved:
+• Check if average reward ≥ 195 over last 100 episodes
+• If yes → stop training (preserve learned policy)
+• Typically solves around episode 2,000-3,000
+
+6.5 Number of Bins
+──────────────────
+
+Configuration: [8, 10, 20, 20]
+
+Position bins (8): Coarse is okay
+Velocity bins (10): Moderate precision
+Angle bins (20): HIGH precision (most critical!)
+Angular velocity bins (20): HIGH precision
+
+Why More Bins for Angle?
+• Small angle differences require different actions
+• Pole at -2° vs. +2° needs opposite corrections
+• More bins → finer control → better balancing
+
+Trade-off:
+More bins → Better performance, slower learning, more memory
+Fewer bins → Worse performance, faster learning, less memory
+
+Our choice (8×10×20×20 = 32,000 states) balances these factors well.
+
+================================================================================
+7. TRAINING PROCESS
+================================================================================
+
+7.1 Training Phases
+───────────────────
+
+Phase 1: Random Exploration (Episodes 0-500)
+├─ Epsilon: 1.0 → 0.78
+├─ Behavior: Mostly random actions
+├─ Learning: Discovering basic cause-effect relationships
+├─ Q-values: Starting to differentiate good/bad actions
+└─ Performance: Poor (20-60 steps average)
+
+Phase 2: Early Learning (Episodes 500-2000)
+├─ Epsilon: 0.78 → 0.37
+├─ Behavior: Mix of exploration and exploitation
+├─ Learning: Identifying promising strategies
+├─ Q-values: Converging toward accurate estimates
+└─ Performance: Improving (60-150 steps average)
+
+Phase 3: Rapid Improvement (Episodes 2000-3000)
+├─ Epsilon: 0.37 → 0.22
+├─ Behavior: Mostly exploitation with some exploration
+├─ Learning: Refining successful strategies
+├─ Q-values: Well-calibrated for most states
+└─ Performance: Good (150-200 steps average) ← SOLVING!
+
+Phase 4: Mastery (Episodes 3000+)
+├─ Epsilon: 0.22 → 0.01
+├─ Behavior: Almost pure exploitation
+├─ Learning: Fine-tuning edge cases
+├─ Q-values: Converged
+└─ Performance: Excellent (195-210 steps average)
+
+7.2 What Happens in Each Episode
+────────────────────────────────
+
+Typical Episode Flow:
+
+1. Reset: Get initial state
+   └─ Cart at center, pole nearly vertical
+
+2. Loop (until pole falls or 500 steps):
+   
+   a) Observe state: [pos, vel, angle, ang_vel]
+   
+   b) Discretize: [1.2, -0.3, 0.05, 0.1] → (6, 4, 15, 13)
+   
+   c) Choose action:
+      ├─ Check Q-table: Q[(6,4,15,13), LEFT] = 12.3
+      │                  Q[(6,4,15,13), RIGHT] = 8.7
+      ├─ Generate random(0,1) = 0.85
+      ├─ Compare with epsilon (0.3)
+      └─ 0.85 > 0.3 → Exploit: choose LEFT (best action)
+   
+   d) Execute action:
+      └─ Push cart left
+   
+   e) Observe result:
+      ├─ Next state: [1.05, -0.5, 0.03, -0.2] → (6, 3, 14, 11)
+      ├─ Reward: 1.0 (still balanced!)
+      └─ Done: False
+   
+   f) Update Q-table:
+      ├─ Current: Q[(6,4,15,13), LEFT] = 12.3
+      ├─ Target: 1.0 + 0.99 × max(Q[(6,3,14,11)]) = 1.0 + 0.99 × 13.1 = 13.969
+      ├─ Error: 13.969 - 12.3 = 1.669
+      ├─ Update: 12.3 + 0.15 × 1.669 = 12.550
+      └─ New: Q[(6,4,15,13), LEFT] = 12.550 ✓
+   
+   g) Move to next state: (6, 3, 14, 11)
+   
+   h) Repeat until done
+
+3. Episode ends:
+   ├─ Total reward: 187 steps
+   ├─ Decay epsilon: 0.300 → 0.2998
+   └─ Record performance
+
+4. Start next episode
+
+7.3 Learning Dynamics
+─────────────────────
+
+How Q-Values Evolve:
+
+Episode 1 (random):
+State (5,5,10,10): Q_left = 0.0, Q_right = 0.0
+└─ Try left → immediate reward 1.0, next max Q = 0.0
+└─ Update: Q_left = 0 + 0.15(1.0 + 0 - 0) = 0.15
+
+Episode 5 (still mostly random):
+State (5,5,10,10): Q_left = 0.15, Q_right = 0.08
+└─ Try left → reward 1.0, next max Q = 0.3
+└─ Update: Q_left = 0.15 + 0.15(1.0 + 0.99×0.3 - 0.15) = 0.323
+
+Episode 100 (learning patterns):
+State (5,5,10,10): Q_left = 3.2, Q_right = 1.8
+└─ Try left → reward 1.0, next max Q = 4.1
+└─ Update: Q_left = 3.2 + 0.15(1.0 + 0.99×4.1 - 3.2) = 3.805
+
+Episode 2000 (converging):
+State (5,5,10,10): Q_left = 15.7, Q_right = 8.2
+└─ Rarely visit this state now (good policy avoids it)
+└─ Q-values stable
+
+Bootstrapping Effect:
+Q-values propagate backward through time:
+• Good terminal states get high Q-values first
+• States leading to good terminal states get high Q-values next
+• This propagates backward to earlier states
+• Eventually, even initial states have accurate Q-values
+
+================================================================================
+8. PERFORMANCE ANALYSIS
+================================================================================
+
+8.1 Success Metrics
+───────────────────
+
+Solved Threshold: 195 average reward over 100 episodes
+
+Why 195?
+• Maximum episode length is 500 steps
+• 195 = 39% of maximum, but consistently achieving this is hard
+• Requires robust policy that rarely fails
+
+Additional Metrics:
+├─ Peak performance: Best 100-episode average
+├─ Success rate: % of episodes ≥ 195
+├─ Consistency: Standard deviation of rewards
+├─ Convergence time: Episodes until solved
+└─ Final performance: Last 100-episode average
+
+8.2 Interpreting Training Curves
+────────────────────────────────
+
+Good Training Curve:
+  Reward
+    │
+200 ├─────────────────────────── (flat, high performance)
+    │                      ╱─────
+150 │                  ╱───
+    │             ╱────
+100 │        ╱────
+    │   ╱────
+ 50 ├───
+    └────────────────────────────> Episodes
+
+Characteristics:
+✓ Steady upward trend
+✓ Reaches and maintains 195+
+✓ Low variance in later episodes
+✓ Plateaus at high performance
+
+Bad Training Curve (Performance Decay):
+  Reward
+    │      ╱──╲
+200 ├─────╱    ╲
+    │           ╲    ╱╲
+150 │            ╲  ╱  ╲╱╲
+    │             ╲╱      ╲
+100 │                      ╲╱╲
+    │
+ 50 │
+    └────────────────────────────> Episodes
+
+Characteristics:
+✗ Performance drops after peak
+✗ High variance
+✗ Doesn't maintain solved status
+✗ Overtraining / catastrophic forgetting
+
+8.3 Common Training Outcomes
+────────────────────────────
+
+Outcome 1: Quick Success
+├─ Solves by episode 2000-3000
+├─ Maintains 195+ thereafter
+├─ Cause: Good hyperparameters, lucky initialization
+└─ Action: Stop training to preserve policy
+
+Outcome 2: Slow Learning
+├─ Takes 8000+ episodes to solve
+├─ Eventually reaches 195+
+├─ Cause: Too much exploration, low learning rate
+└─ Action: Increase learning rate, decrease epsilon decay
+
+Outcome 3: Plateau Below Target
+├─ Reaches 150-170 and stalls
+├─ Never crosses 195 threshold
+├─ Cause: Insufficient bins, poor discretization
+└─ Action: Increase bins for angle/angular velocity
+
+Outcome 4: Performance Decay
+├─ Solves early, then degrades
+├─ Oscillates around 150-180
+├─ Cause: Continued exploration corrupting good Q-values
+└─ Action: Implement early stopping or freeze epsilon
+
+Outcome 5: Unstable Learning
+├─ High variance throughout
+├─ Doesn't converge
+├─ Cause: Learning rate too high, too much exploration
+└─ Action: Reduce learning rate, faster epsilon decay
+
+8.4 Our Results Analysis
+────────────────────────
+
+First Attempt (10 bins each):
+├─ Final average: ~150 steps
+├─ Peak: ~150 steps
+├─ Outcome: Plateau below target
+└─ Issue: Insufficient precision for angle control
+
+Second Attempt (improved bins):
+├─ Final average: 195-210 steps
+├─ Peak: ~210 steps
+├─ Outcome: SOLVED! Then performance decay
+└─ Issue: Overtraining after solving
+
+Lessons Learned:
+1. Bin configuration matters (especially for critical dimensions)
+2. Early stopping prevents performance degradation
+3. Slower epsilon decay allows better exploration
+4. Agent CAN solve CartPole with proper configuration
+
+================================================================================
+9. COMMON ISSUES AND SOLUTIONS
+================================================================================
+
+9.1 Problem: Performance Plateau Below Target
+──────────────────────────────────────────────
+
+Symptoms:
+• Average reward stalls at 100-150
+• Never reaches 195
+• Training curve flattens early
+
+Causes:
+├─ Too few bins (coarse discretization)
+├─ Poor bin distribution
+├─ Epsilon decays too fast (stops exploring early)
+└─ Learning rate too low
+
+Solutions:
+1. Increase bins for critical dimensions (angle, angular velocity)
+   Before: [10, 10, 10, 10]
+   After:  [8, 10, 20, 20]
+
+2. Use tighter bounds for more useful precision
+   Before: [-4.8, 4.8]
+   After:  [-2.4, 2.4]
+
+3. Slow down epsilon decay
+   Before: epsilon_decay = 0.995
+   After:  epsilon_decay = 0.9995
+
+4. Increase learning rate
+   Before: learning_rate = 0.1
+   After:  learning_rate = 0.15
+
+9.2 Problem: Performance Decay After Solving
+─────────────────────────────────────────────
+
+Symptoms:
+• Agent solves CartPole (195+)
+• Performance then degrades
+• Average drops to 150-180
+• High variance in later episodes
+
+Causes:
+├─ Continued exploration with low epsilon
+├─ Random actions lead to bad experiences
+├─ Bad experiences update and corrupt good Q-values
+└─ No mechanism to preserve learned policy
+
+Solutions:
+1. Early Stopping (BEST)
+   Stop training once solved:
+   
+   if len(episode_rewards) >= 100:
+       if np.mean(episode_rewards[-100:]) >= 195:
+           print("Solved! Stopping training.")
+           break
+
+2. Freeze Epsilon
+   Set epsilon = 0 once solved:
+   
+   if solved and not epsilon_frozen:
+       epsilon = 0.0
+       epsilon_frozen = True
+
+3. Decay Learning Rate
+   Reduce updates over time:
+   
+   learning_rate = max(0.01, learning_rate * 0.9999)
+
+4. Experience Replay
+   Periodically replay good episodes
+
+9.3 Problem: Very Slow Learning
+────────────────────────────────
+
+Symptoms:
+• After 10,000 episodes still poor (< 100 avg)
+• Very slow improvement
+• Q-values changing slowly
+
+Causes:
+├─ Learning rate too low
+├─ Too much exploration (epsilon not decaying)
+├─ Q-table too large (too many bins)
+└─ Poor state representation
+
+Solutions:
+1. Increase learning rate
+   From: 0.05 → To: 0.15
+
+2. Faster epsilon decay
+   From: 0.9995 → To: 0.995
+
+3. Reduce bins slightly
+   From: [20, 20, 30, 30] → To: [8, 10, 20, 20]
+
+4. Check discretization is working:
+   Print some discrete states to verify
+
+9.4 Problem: Unstable/Erratic Learning
+───────────────────────────────────────
+
+Symptoms:
+• High variance throughout training
+• Performance bounces wildly
+• Never stabilizes
+
+Causes:
+├─ Learning rate too high
+├─ Epsilon too high for too long
+├─ Poor discretization (states changing chaotically)
+└─ Bug in code
+
+Solutions:
+1. Reduce learning rate
+   From: 0.5 → To: 0.15
+
+2. Ensure epsilon decays
+   Check: epsilon *= decay each episode
+
+3. Verify discretization
+   Ensure discrete states are consistent
+
+4. Check for bugs:
+   - Q-table updates happening?
+   - Epsilon decaying?
+   - Actions being chosen correctly?
+
+9.5 Problem: Can't Reproduce Results
+─────────────────────────────────────
+
+Symptoms:
+• Different performance each run
+• Sometimes solves, sometimes doesn't
+
+Causes:
+├─ Random initialization (env.reset() uses different seeds)
+├─ Stochastic nature of epsilon-greedy
+└─ Sensitive to initial experiences
+
+Solutions:
+1. Set random seeds:
+   np.random.seed(42)
+   env.reset(seed=42)
+
+2. Run multiple trials and average
+
+3. Use slower epsilon decay for more robust learning
+
+9.6 Quick Debugging Checklist
+──────────────────────────────
+
+If training isn't working:
+
+□ Check Q-table is being updated (print Q-values)
+□ Verify discretization is correct (print discrete states)
+□ Ensure epsilon is decaying (print epsilon each episode)
+□ Confirm actions are being chosen correctly
+□ Check reward is accumulated properly
+□ Verify episode termination conditions
+□ Look for NaN or Inf in Q-table
+□ Ensure hyperparameters are reasonable
+□ Test with simpler configuration first
+□ Check gymnasium version (pip list | grep gymnasium)
+
+================================================================================
+10. KEY TAKEAWAYS
+================================================================================
+
+10.1 Q-Learning Fundamentals
+─────────────────────────────
+
+✓ Q-learning learns a value function Q(s,a) through experience
+✓ Updates use Bellman equation: Q ← Q + α[r + γ·max Q' - Q]
+✓ Bootstrapping: uses own estimates to improve itself
+✓ Model-free: doesn't need to know environment dynamics
+✓ Off-policy: learns optimal policy while following exploratory policy
+
+10.2 CartPole-Specific Insights
+────────────────────────────────
+
+✓ Pole angle is most critical dimension (needs most bins)
+✓ Discretization quality directly impacts performance
+✓ Tighter bounds improve bin resolution
+✓ Early stopping prevents performance degradation
+✓ 195+ average over 100 episodes = solved
+
+10.3 Hyperparameter Wisdom
+───────────────────────────
+
+✓ Learning rate (0.1-0.2): Balance speed vs. stability
+✓ Discount factor (0.95-0.99): High for long-term planning
+✓ Epsilon decay (0.995-0.9995): Slower is more robust
+✓ Bins (8-20 per dim): More for critical dimensions
+✓ Episodes (10k-15k): Use early stopping
+
+10.4 Training Best Practices
+─────────────────────────────
+
+✓ Start with coarse bins, refine if needed
+✓ Monitor training curves (plot as you go)
+✓ Implement early stopping to preserve good policies
+✓ Use slower epsilon decay than you think you need
+✓ Save Q-table periodically
+✓ Test performance separate from training
+
+10.5 Common Pitfalls to Avoid
+──────────────────────────────
+
+✗ Don't over-train (implement early stopping)
+✗ Don't use too few bins (especially for angle)
+✗ Don't decay epsilon too fast (need sustained exploration)
+✗ Don't use learning rate too high (instability)
+✗ Don't expect perfect consistency (RL is inherently stochastic)
+
+10.6 Extensions and Improvements
+─────────────────────────────────
+
+Possible enhancements:
+• Deep Q-Networks (DQN): Use neural network instead of table
+• Double Q-Learning: Reduce overestimation bias
+• Prioritized Experience Replay: Learn from important experiences
+• Adaptive binning: Adjust bins based on state visitation
+• Function approximation: Generalize across similar states
+
+10.7 Practical Lessons
+──────────────────────
+
+✓ Simple algorithms (Q-learning) can solve complex problems
+✓ Discretization is powerful but requires careful tuning
+✓ Exploration-exploitation trade-off is crucial
+✓ More training isn't always better (diminishing returns)
+✓ Visualization helps understand learning dynamics
+✓ Hyperparameters matter more than you think
+✓ Random seeds affect reproducibility
+✓ RL requires patience (10k episodes is normal)
+
+================================================================================
+11. REFERENCES
+================================================================================
+
+Papers:
+-------
+[1] Watkins, C. J., & Dayan, P. (1992). Q-learning. Machine learning, 8(3-4), 
+    279-292.
+
+[2] Sutton, R. S., & Barto, A. G. (2018). Reinforcement learning: An 
+    introduction (2nd ed.). MIT press.
+
+Documentation:
+--------------
+[3] Gymnasium CartPole-v1 Environment
+    https://gymnasium.farama.org/environments/classic_control/cart_pole/
+
+[4] OpenAI Spinning Up in Deep RL
+    https://spinningup.openai.com/
+
+[5] Gymnasium Documentation
+    https://gymnasium.farama.org/
+
+Code Examples:
+--------------
+[6] CleanRL: Q-Learning Implementation
+    https://github.com/vwxyzjn/cleanrl
+
+[7] Stable Baselines3: RL Algorithms
+    https://stable-baselines3.readthedocs.io/
+
+Tutorials:
+----------
+[8] Reinforcement Learning with CartPole
+    https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
+
+[9] Introduction to Q-Learning
+    https://www.learndatasci.com/tutorials/reinforcement-q-learning-scratch-python-openai-gym/
+
+Books:
+------
+[10] Sutton & Barto (2018). "Reinforcement Learning: An Introduction"
+     - The RL bible, comprehensive coverage
+     - Free online: http://incompleteideas.net/book/
+
+[11] Géron, A. (2019). "Hands-On Machine Learning with Scikit-Learn, Keras, 
+     and TensorFlow" (2nd ed.)
+     - Chapter 18: Reinforcement Learning
+
+================================================================================
+GLOSSARY
+================================================================================
+
+Action: Decision made by agent (e.g., push left/right)
+
+Agent: The learner/decision-maker in RL
+
+Bellman Equation: Recursive relationship defining optimal values
+
+Bootstrapping: Using own estimates to update estimates
+
+Catastrophic Forgetting: Loss of learned knowledge due to new experiences
+
+Discount Factor (γ): How much to value future rewards
+
+Discretization: Converting continuous values to discrete bins
+
+Episode: One complete run from start to terminal state
+
+Epsilon (ε): Exploration rate in epsilon-greedy
+
+Epsilon-Greedy: Balance exploration (random) and exploitation (best action)
+
+Environment: World the agent interacts with
+
+Experience: Tuple of (state, action, reward, next_state)
+
+Exploitation: Using current knowledge (best known action)
+
+Exploration: Trying new actions to learn more
+
+Learning Rate (α): How much to adjust Q-values on updates
+
+Model-Free: Algorithm that doesn't need environment model
+
+Off-Policy: Learning optimal policy while following different policy
+
+Policy: Strategy mapping states to actions
+
+Q-Function: Expected total reward for state-action pair
+
+Q-Learning: Value-based RL algorithm learning Q-function
+
+Q-Table: Lookup table storing Q-values
+
+Reward: Feedback signal from environment
+
+State: Current situation/observation
+
+Temporal Difference (TD): Difference between estimated and actual value
+
+Value Function: Expected total reward from a state
+
+================================================================================
+APPENDIX: CODE STRUCTURE
+================================================================================
+
+Complete Q-Learning Implementation Structure:
+
+1. Setup
+   ├─ Import libraries (gymnasium, numpy, matplotlib)
+   ├─ Create environment
+   └─ Define hyperparameters
+
+2. Discretization
+   ├─ Define bins and bounds
+   ├─ Create bin edges
+   └─ Implement discretize_state function
+
+3. Q-Table
+   ├─ Initialize to zeros
+   └─ Shape: (n_bins..., n_actions)
+
+4. Functions
+   ├─ choose_action(state, epsilon): Epsilon-greedy selection
+   └─ update_q_table(s, a, r, s', done): Q-value update
+
+5. Training Loop
+   ├─ For each episode:
+   │   ├─ Reset environment
+   │   ├─ For each step:
+   │   │   ├─ Choose action
+   │   │   ├─ Execute action
+   │   │   ├─ Update Q-table
+   │   │   └─ Check if done
+   │   ├─ Decay epsilon
+   │   └─ Record performance
+   └─ Check for early stopping
+
+6. Evaluation
+   ├─ Test trained policy (epsilon=0)
+   ├─ Calculate statistics
+   └─ Generate visualizations
+
+7. Visualization
+   ├─ Training curves
+   ├─ Moving averages
+   ├─ Epsilon decay
+   └─ Performance metrics
+
+================================================================================
+END OF DOCUMENT
+================================================================================
+
+This guide covers the complete theory and practice of Q-Learning for CartPole.
+
+For questions or clarifications:
+- Review sections systematically
+- Try modifying hyperparameters
+- Experiment with different configurations
+- Visualize results to understand behavior
+
+Good luck with your Scalable Computing exam!
+
+Vinol
+Trinity College Dublin
+November 2025

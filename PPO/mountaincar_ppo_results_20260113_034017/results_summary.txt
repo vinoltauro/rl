@@ -1,0 +1,25 @@
+MOUNTAINCAR PPO TRAINING RESULTS
+======================================================================
+
+TRAINING PERFORMANCE
+----------------------------------------------------------------------
+Total Episodes: 2000
+Total Updates: 100
+Mean Reward: -200.00
+Std Reward: 0.00
+Last 100 Avg: -200.00
+Best Reward: -200
+Mean Episode Length: 200.00
+
+TEST PERFORMANCE
+----------------------------------------------------------------------
+Test Mean: -200.00
+Test Std: 0.00
+Success Rate: 0.0%
+
+FINAL LOSSES
+----------------------------------------------------------------------
+Policy Loss: -0.000816
+Value Loss: 157.864111
+Entropy: 0.265126
+Clip Fraction: 0.018080
