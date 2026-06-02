@@ -121,13 +121,18 @@ def train():
             returns.insert(0, R)
 
         returns_t = torch.tensor(returns, dtype=torch.float32, device=DEVICE)
-        returns_t = (returns_t - returns_t.mean()) / (returns_t.std() + 1e-9)
+        # Clamp std to ≥1 to prevent normalization explosion when all returns
+        # are identical (e.g. agent never reaches goal → std ≈ 0)
+        std = returns_t.std().clamp(min=1.0)
+        returns_t = (returns_t - returns_t.mean()) / std
         values_t  = torch.cat(values).squeeze(-1)
 
         advantages  = returns_t - values_t.detach()
         policy_loss = -(torch.stack(log_probs) * advantages).sum()
         value_loss  = F.smooth_l1_loss(values_t, returns_t)
-        loss        = policy_loss + value_loss
+        # Subtract entropy to maximise it — prevents policy collapsing to deterministic
+        entropy     = -torch.stack(log_probs).mean()   # ≈ H(π), high when exploratory
+        loss        = policy_loss + value_loss - 0.01 * entropy
 
         optimizer.zero_grad()
         loss.backward()
