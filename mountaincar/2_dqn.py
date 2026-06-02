@@ -1,3 +1,4 @@
+import csv
 import random
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,20 +16,27 @@ random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
 
+PLT_STYLE = {
+    'font.size': 12, 'axes.titlesize': 13, 'axes.labelsize': 12,
+    'xtick.labelsize': 10, 'ytick.labelsize': 10,
+    'legend.fontsize': 10, 'figure.titlesize': 14,
+}
+plt.rcParams.update(PLT_STYLE)
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Hyperparameters
-BATCH_SIZE   = 64
-GAMMA        = 0.99
-EPS_START    = 1.0
-EPS_END      = 0.01
-EPS_DECAY    = 10000  # steps — slow enough to explore MountainCar adequately
-TAU          = 0.005  # soft target update
-LR           = 1e-3
-MEMORY_SIZE  = 20000
-N_EPISODES   = 600
-MAX_STEPS    = 400    # slightly extended to help exploration
-SOLVED_AVG   = -110.0
+BATCH_SIZE  = 64
+GAMMA       = 0.99
+EPS_START   = 1.0
+EPS_END     = 0.01
+EPS_DECAY   = 10000   # steps — slow enough to explore MountainCar adequately
+TAU         = 0.005   # soft target update
+LR          = 1e-3
+MEMORY_SIZE = 20000
+N_EPISODES  = 600
+MAX_STEPS   = 400
+SOLVED_AVG  = -110.0
 
 
 class DQN(nn.Module):
@@ -110,33 +118,37 @@ def train():
     memory    = deque(maxlen=MEMORY_SIZE)
 
     episode_rewards = []
+    episode_lengths = []
     loss_history    = []
     epsilon_history = []
     steps_done      = 0
+    solve_ep        = None
 
     print(f"MountainCar DQN (reward shaping) | Device: {DEVICE}")
-    print("=" * 50)
+    print("=" * 55)
 
     for episode in range(N_EPISODES):
         state, _ = env.reset()
-        state_t   = torch.tensor(state, dtype=torch.float32, device=DEVICE).unsqueeze(0)
-        total_reward  = 0
+        state_t  = torch.tensor(state, dtype=torch.float32, device=DEVICE).unsqueeze(0)
+        total_reward   = 0
+        steps          = 0
         episode_losses = []
 
         for _ in range(MAX_STEPS):
             action, eps = select_action(policy_net, state_t, steps_done, n_actions)
-            steps_done  += 1
+            steps_done += 1
 
             next_obs, raw_reward, terminated, truncated, _ = env.step(action.item())
             done    = terminated or truncated
             shaped  = shape_reward(next_obs[0], next_obs[1], terminated)
-            total_reward += raw_reward  # track real reward for evaluation
+            total_reward += raw_reward   # always track real reward
 
             shaped_t   = torch.tensor([shaped], dtype=torch.float32, device=DEVICE)
             next_state = None if terminated else torch.tensor(next_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
 
             memory.append((state_t, action, next_state, shaped_t))
             state_t = next_state
+            steps  += 1
 
             loss = optimize(policy_net, target_net, optimizer, memory)
             if loss is not None:
@@ -147,101 +159,245 @@ def train():
                 break
 
         episode_rewards.append(total_reward)
+        episode_lengths.append(steps)
         epsilon_history.append(eps)
         loss_history.append(np.mean(episode_losses) if episode_losses else 0.0)
 
         if (episode + 1) % 50 == 0:
             avg = np.mean(episode_rewards[-100:]) if len(episode_rewards) >= 100 else np.mean(episode_rewards)
-            print(f"Episode {episode+1:4d} | Avg(100): {avg:7.2f} | Eps: {eps:.3f}")
+            print(f"Episode {episode+1:4d} | Avg(100): {avg:7.2f} | Eps: {eps:.4f} | Loss: {loss_history[-1]:.4f}")
 
         if len(episode_rewards) >= 100 and np.mean(episode_rewards[-100:]) >= SOLVED_AVG:
-            print(f"\nSolved at episode {episode+1}! Avg(100): {np.mean(episode_rewards[-100:]):.2f}")
+            if solve_ep is None:
+                solve_ep = episode + 1
+            print(f"\nSolved at episode {solve_ep}! Avg(100): {np.mean(episode_rewards[-100:]):.2f}")
             break
 
     env.close()
-    return policy_net, episode_rewards, loss_history, epsilon_history
+    return policy_net, episode_rewards, episode_lengths, loss_history, epsilon_history, solve_ep
 
 
-def plot_results(episode_rewards, loss_history, epsilon_history, save_dir):
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+def save_log(episode_rewards, episode_lengths, loss_history, epsilon_history, save_dir):
+    path = f'{save_dir}/training_log.csv'
+    with open(path, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['episode', 'reward', 'steps', 'loss', 'epsilon'])
+        for i in range(len(episode_rewards)):
+            writer.writerow([i + 1, episode_rewards[i], episode_lengths[i],
+                             round(loss_history[i], 6), round(epsilon_history[i], 6)])
+    print(f"Saved: {path}")
 
-    axes[0, 0].plot(episode_rewards, alpha=0.5, color='blue', linewidth=0.5)
-    axes[0, 0].axhline(y=SOLVED_AVG, color='red', linestyle='--', label=f'Solved ({SOLVED_AVG})')
-    axes[0, 0].set_title('Episode Rewards (real score)')
+
+def save_summary(episode_rewards, episode_lengths, loss_history, solve_ep, save_dir):
+    n        = len(episode_rewards)
+    last_100 = episode_rewards[-100:] if n >= 100 else episode_rewards
+    success  = sum(1 for r in last_100 if r >= SOLVED_AVG)
+    valid_l  = [l for l in loss_history if l > 0]
+
+    lines = [
+        "=" * 55,
+        "TRAINING SUMMARY — MountainCar DQN",
+        "=" * 55,
+        f"  Episodes trained         : {n:,}",
+        f"  Solved at episode        : {solve_ep if solve_ep else 'Not solved'}",
+        f"  Mean reward (all)        : {np.mean(episode_rewards):.2f} ± {np.std(episode_rewards):.2f}",
+        f"  Mean reward (last 100)   : {np.mean(last_100):.2f} ± {np.std(last_100):.2f}",
+        f"  Success rate (last 100)  : {success} / {len(last_100)}  ({100*success/len(last_100):.1f}%)",
+        f"  Mean steps (last 100)    : {np.mean(episode_lengths[-100:]):.1f}",
+        f"  Final mean loss          : {np.mean(loss_history[-50:]):.6f}",
+        "",
+        "  Hyperparameters",
+        f"    Batch size             : {BATCH_SIZE}",
+        f"    Gamma                  : {GAMMA}",
+        f"    Learning rate          : {LR}",
+        f"    Epsilon                : {EPS_START} → {EPS_END}  (decay steps: {EPS_DECAY})",
+        f"    Soft update tau        : {TAU}",
+        f"    Replay buffer          : {MEMORY_SIZE:,}",
+        f"    Max steps/episode      : {MAX_STEPS}",
+        f"    Reward shaping         : height + 100·KE - 1  (+100 at goal)",
+        "=" * 55,
+    ]
+    text = '\n'.join(lines)
+    print('\n' + text)
+    with open(f'{save_dir}/summary.txt', 'w') as f:
+        f.write(text + '\n')
+    print(f"Saved: {save_dir}/summary.txt")
+
+
+def plot_results(episode_rewards, episode_lengths, loss_history, epsilon_history, save_dir):
+    window = 50
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+
+    # 1. Raw rewards
+    axes[0, 0].plot(episode_rewards, alpha=0.4, color='steelblue', linewidth=0.6, label='Per episode')
+    axes[0, 0].axhline(y=SOLVED_AVG, color='red', linestyle='--', linewidth=1.5, label=f'Solved ({SOLVED_AVG})')
     axes[0, 0].set_xlabel('Episode')
-    axes[0, 0].set_ylabel('Reward')
+    axes[0, 0].set_ylabel('Reward (real score)')
+    axes[0, 0].set_title('Episode Rewards')
     axes[0, 0].legend()
     axes[0, 0].grid(True, alpha=0.3)
 
-    window = 50
+    # 2. Moving average
     if len(episode_rewards) >= window:
         ma = np.convolve(episode_rewards, np.ones(window) / window, mode='valid')
-        axes[0, 1].plot(range(window - 1, len(episode_rewards)), ma, color='green', linewidth=2)
-        axes[0, 1].axhline(y=SOLVED_AVG, color='red', linestyle='--', label=f'Solved ({SOLVED_AVG})')
-    axes[0, 1].set_title(f'Moving Average ({window} episodes)')
+        axes[0, 1].plot(range(window - 1, len(episode_rewards)), ma, color='green', linewidth=2, label=f'{window}-ep avg')
+        axes[0, 1].axhline(y=SOLVED_AVG, color='red', linestyle='--', linewidth=1.5)
     axes[0, 1].set_xlabel('Episode')
     axes[0, 1].set_ylabel('Average Reward')
+    axes[0, 1].set_title(f'Moving Average ({window} episodes)')
     axes[0, 1].legend()
     axes[0, 1].grid(True, alpha=0.3)
 
-    axes[1, 0].plot(loss_history, color='purple', alpha=0.7, linewidth=0.8)
-    axes[1, 0].set_title('Training Loss')
+    # 3. Steps per episode
+    axes[0, 2].plot(episode_lengths, alpha=0.4, color='darkorange', linewidth=0.6)
+    axes[0, 2].axhline(y=110, color='green', linestyle='--', linewidth=1.5, label='Target (≤110)')
+    if len(episode_lengths) >= window:
+        ma_len = np.convolve(episode_lengths, np.ones(window) / window, mode='valid')
+        axes[0, 2].plot(range(window - 1, len(episode_lengths)), ma_len, color='saddlebrown', linewidth=2)
+    axes[0, 2].set_xlabel('Episode')
+    axes[0, 2].set_ylabel('Steps')
+    axes[0, 2].set_title('Steps per Episode')
+    axes[0, 2].legend()
+    axes[0, 2].grid(True, alpha=0.3)
+
+    # 4. Training loss
+    valid_idx    = [i for i, l in enumerate(loss_history) if l > 0]
+    valid_losses = [loss_history[i] for i in valid_idx]
+    if valid_losses:
+        axes[1, 0].plot(valid_idx, valid_losses, color='purple', alpha=0.5, linewidth=0.8)
+        if len(valid_losses) >= 20:
+            ma_loss = np.convolve(valid_losses, np.ones(20) / 20, mode='valid')
+            axes[1, 0].plot([valid_idx[i] for i in range(19, len(valid_idx))],
+                            ma_loss, color='black', linewidth=1.5, label='20-ep trend')
     axes[1, 0].set_xlabel('Episode')
-    axes[1, 0].set_ylabel('Loss')
+    axes[1, 0].set_ylabel('Loss (Huber)')
+    axes[1, 0].set_title('Training Loss')
     axes[1, 0].set_yscale('symlog', linthresh=1e-4)
+    axes[1, 0].legend()
     axes[1, 0].grid(True, alpha=0.3)
 
-    axes[1, 1].plot(epsilon_history, color='orange', linewidth=2)
-    axes[1, 1].set_title('Exploration Rate (Epsilon)')
+    # 5. Epsilon decay
+    axes[1, 1].plot(epsilon_history, color='darkorange', linewidth=1.5)
     axes[1, 1].set_xlabel('Episode')
-    axes[1, 1].set_ylabel('Epsilon')
+    axes[1, 1].set_ylabel('Epsilon (ε)')
+    axes[1, 1].set_title('Exploration Rate Decay')
     axes[1, 1].grid(True, alpha=0.3)
 
-    plt.suptitle('MountainCar DQN (reward shaping)', fontsize=14, fontweight='bold')
+    # 6. Reward distribution
+    axes[1, 2].hist(episode_rewards, bins=40, color='steelblue', edgecolor='white', alpha=0.85)
+    axes[1, 2].axvline(x=SOLVED_AVG, color='red', linestyle='--', linewidth=1.5, label=f'Solved ({SOLVED_AVG})')
+    axes[1, 2].axvline(x=np.mean(episode_rewards), color='orange', linewidth=1.5,
+                        label=f'Mean: {np.mean(episode_rewards):.1f}')
+    axes[1, 2].set_xlabel('Reward')
+    axes[1, 2].set_ylabel('Frequency')
+    axes[1, 2].set_title('Reward Distribution')
+    axes[1, 2].legend()
+    axes[1, 2].grid(True, alpha=0.3, axis='y')
+
+    plt.suptitle('MountainCar DQN — Training Analysis', fontsize=14, fontweight='bold')
     plt.tight_layout()
     plt.savefig(f'{save_dir}/training_results.png', dpi=150, bbox_inches='tight')
     plt.close()
     print(f"Saved: {save_dir}/training_results.png")
 
 
+def plot_trajectory(policy_net, save_dir):
+    """Run one greedy episode and plot position + velocity over time."""
+    env = gym.make('MountainCar-v0')
+    state, _ = env.reset(seed=0)
+    positions, velocities = [], []
+    policy_net.eval()
+
+    for _ in range(200):
+        positions.append(state[0])
+        velocities.append(state[1])
+        state_t = torch.tensor(state, dtype=torch.float32, device=DEVICE).unsqueeze(0)
+        with torch.no_grad():
+            action = policy_net(state_t).max(1)[1].item()
+        state, _, terminated, truncated, _ = env.step(action)
+        if terminated or truncated:
+            break
+
+    positions.append(state[0])
+    velocities.append(state[1])
+    env.close()
+
+    reached   = max(positions) >= 0.5
+    status    = f"REACHED GOAL in {len(positions)-1} steps" if reached else f"DID NOT REACH GOAL ({len(positions)-1} steps)"
+    timesteps = range(len(positions))
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 4))
+
+    axes[0].plot(timesteps, positions, color='steelblue', linewidth=1.8)
+    axes[0].axhline(y=0.5,  color='green', linestyle='--', linewidth=1.5, label='Goal (pos = 0.5)')
+    axes[0].axhline(y=-0.5, color='gray',  linestyle=':', alpha=0.5,      label='Valley bottom (-0.5)')
+    axes[0].set_xlabel('Timestep')
+    axes[0].set_ylabel('Position')
+    axes[0].set_title('Car Position Over Time')
+    axes[0].legend()
+    axes[0].grid(True, alpha=0.3)
+
+    axes[1].plot(timesteps, velocities, color='darkorange', linewidth=1.8)
+    axes[1].axhline(y=0, color='gray', linestyle='--', alpha=0.5, label='Zero velocity')
+    axes[1].set_xlabel('Timestep')
+    axes[1].set_ylabel('Velocity')
+    axes[1].set_title('Car Velocity Over Time')
+    axes[1].legend()
+    axes[1].grid(True, alpha=0.3)
+
+    plt.suptitle(f'Test Episode Trajectory — {status}', fontsize=13, fontweight='bold')
+    plt.tight_layout()
+    plt.savefig(f'{save_dir}/trajectory.png', dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f"Saved: {save_dir}/trajectory.png")
+
+
 def test_agent(policy_net, n_episodes=20):
     env = gym.make('MountainCar-v0')
-    test_rewards = []
+    test_rewards, test_lengths = [], []
     policy_net.eval()
 
     print(f"\nTesting trained agent ({n_episodes} episodes)...")
     for episode in range(n_episodes):
         state, _ = env.reset()
-        state_t   = torch.tensor(state, dtype=torch.float32, device=DEVICE).unsqueeze(0)
+        state_t  = torch.tensor(state, dtype=torch.float32, device=DEVICE).unsqueeze(0)
         total_reward = 0
+        steps = 0
 
         for _ in range(200):
             with torch.no_grad():
-                action = policy_net(state_t).max(1)[1].view(1, 1)
-            next_obs, reward, terminated, truncated, _ = env.step(action.item())
+                action = policy_net(state_t).max(1)[1].item()
+            next_obs, reward, terminated, truncated, _ = env.step(action)
             state_t = torch.tensor(next_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
             total_reward += reward
+            steps += 1
             if terminated or truncated:
                 break
 
         test_rewards.append(total_reward)
+        test_lengths.append(steps)
         status = "✓" if total_reward >= SOLVED_AVG else "✗"
-        print(f"  {status} Test {episode+1:2d}: {total_reward:6.1f}")
+        print(f"  {status} Test {episode+1:2d}: {total_reward:6.1f}  ({steps:3d} steps)")
 
     avg     = np.mean(test_rewards)
     success = sum(1 for r in test_rewards if r >= SOLVED_AVG)
-    print(f"\n  Average: {avg:.2f}  |  Success: {success}/{n_episodes}")
-    print(f"  {'Solved!' if avg >= SOLVED_AVG else 'Needs more training.'}")
+    print(f"\n  Average : {avg:.2f} ± {np.std(test_rewards):.2f}")
+    print(f"  Success : {success}/{n_episodes}  ({100*success/n_episodes:.0f}%)")
+    print(f"  Result  : {'SOLVED' if avg >= SOLVED_AVG else 'Needs more training'}")
     env.close()
 
 
 if __name__ == "__main__":
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp   = datetime.now().strftime("%Y%m%d_%H%M%S")
     results_dir = f"results/mountaincar_dqn_{timestamp}"
     os.makedirs(results_dir, exist_ok=True)
 
-    policy_net, rewards, losses, epsilons = train()
-    plot_results(rewards, losses, epsilons, results_dir)
+    policy_net, rewards, lengths, losses, epsilons, solve_ep = train()
+
+    save_log(rewards, lengths, losses, epsilons, results_dir)
+    save_summary(rewards, lengths, losses, solve_ep, results_dir)
+    plot_results(rewards, lengths, losses, epsilons, results_dir)
+    plot_trajectory(policy_net, results_dir)
     test_agent(policy_net)
 
     torch.save(policy_net.state_dict(), f'{results_dir}/model.pth')
