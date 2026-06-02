@@ -18,3 +18,7 @@ echo "=== All done ==="
 echo "=== Starting MC AC (fixed normalisation) ==="
 python3 -u mountaincar/3_actor_critic.py 2>&1 | tee mc_ac4_run.log
 echo "=== Sequential queue complete ==="
+
+echo "=== Starting MC PPO (entropy fixed 0.05→0.001) ==="
+python3 -u mountaincar/4_ppo.py 2>&1 | tee mc_ppo4_run.log
+echo "=== All done ==="
