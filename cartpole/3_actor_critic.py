@@ -83,10 +83,10 @@ def train():
             returns.insert(0, R)
 
         returns_t = torch.tensor(returns, dtype=torch.float32, device=DEVICE)
-        returns_t = (returns_t - returns_t.mean()) / (returns_t.std() + 1e-9)
         values_t  = torch.cat(values).squeeze(-1)
 
-        advantages  = returns_t - values_t.detach()
+        advantages = returns_t - values_t.detach()
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
         policy_loss = -(torch.stack(log_probs) * advantages).sum()
         value_loss  = F.smooth_l1_loss(values_t, returns_t)
         loss        = policy_loss + value_loss

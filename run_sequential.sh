@@ -14,3 +14,7 @@ echo "=== All MountainCar runs done ==="
 echo "=== Starting MC DQN (2000 eps) ==="
 python3 -u mountaincar/2_dqn.py 2>&1 | tee mc_dqn4_run.log
 echo "=== All done ==="
+
+echo "=== Starting MC AC (fixed normalisation) ==="
+python3 -u mountaincar/3_actor_critic.py 2>&1 | tee mc_ac4_run.log
+echo "=== Sequential queue complete ==="
