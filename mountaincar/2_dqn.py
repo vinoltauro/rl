@@ -26,28 +26,6 @@ plt.rcParams.update(PLT_STYLE)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class RunningRewardNorm:
-    """Online mean/std normalisation for shaped rewards (Welford's algorithm).
-    Keeps Q-value targets in a bounded range regardless of reward magnitude.
-    Equivalent to SB3's VecNormalize — prevents Q-value runaway (loss 2107→597→∞)
-    caused by large shaped-reward targets bootstrapping into overestimation."""
-    def __init__(self, clip=10.0):
-        self.n    = 0
-        self.mean = 0.0
-        self.M2   = 0.0
-        self.clip = clip
-
-    def update(self, x):
-        self.n   += 1
-        delta     = x - self.mean
-        self.mean += delta / self.n
-        self.M2  += delta * (x - self.mean)
-
-    def normalize(self, x):
-        std = max(np.sqrt(self.M2 / max(self.n - 1, 1)), 1e-8)
-        return float(np.clip((x - self.mean) / std, -self.clip, self.clip))
-
-
 # Hyperparameters
 BATCH_SIZE  = 128
 GAMMA       = 0.99
@@ -57,7 +35,7 @@ EPS_DECAY   = 50000   # steps — with 200 steps/ep, stays meaningful for ~400+ 
 TARGET_UPDATE = 500    # hard target update every N steps — more stable than soft update
 LR          = 2e-5    # lowered from 5e-5; smaller updates prevent Q-value runaway
 MEMORY_SIZE = 50000
-N_EPISODES  = 5000
+N_EPISODES  = 8000
 MAX_STEPS   = 200     # standardised to match AC/PPO and gym default
 SOLVED_AVG  = -110.0
 
@@ -143,9 +121,8 @@ def train():
     target_net = DQN(n_obs, n_actions).to(DEVICE)
     target_net.load_state_dict(policy_net.state_dict())
 
-    optimizer   = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
-    memory      = deque(maxlen=MEMORY_SIZE)
-    reward_norm = RunningRewardNorm(clip=10.0)
+    optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
+    memory    = deque(maxlen=MEMORY_SIZE)
 
     episode_rewards = []
     episode_lengths = []
@@ -173,11 +150,10 @@ def train():
             shaped  = shape_reward(next_obs[0], next_obs[1], terminated)
             total_reward += raw_reward   # always track real reward
 
-            # Normalise shaped reward before storing — keeps Q-value targets
-            # in bounded range, preventing loss runaway (bug #33/34/35).
-            reward_norm.update(shaped)
-            normed   = reward_norm.normalize(shaped)
-            shaped_t = torch.tensor([normed], dtype=torch.float32, device=DEVICE)
+            # Raw shaped reward — normalisation (v4) removed the directional signal
+            # and prevented goal discovery entirely (avg -200 throughout). High loss
+            # (~700) in v3 reflected correctly large Q-values, not overestimation.
+            shaped_t   = torch.tensor([shaped], dtype=torch.float32, device=DEVICE)
             next_state = None if terminated else torch.tensor(next_obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
 
             memory.append((state_t, action, next_state, shaped_t))
@@ -250,7 +226,7 @@ def save_summary(episode_rewards, episode_lengths, loss_history, solve_ep, save_
         f"    Replay buffer          : {MEMORY_SIZE:,}",
         f"    Max steps/episode      : {MAX_STEPS}",
         f"    Reward shaping         : height + 100·KE - 1  (+2 at goal)",
-        f"    Reward normalisation   : running mean/std (Welford), clip=10 — prevents Q runaway",
+        f"    Reward normalisation   : None — v4 normalisation removed directional signal",
         "=" * 55,
     ]
     text = '\n'.join(lines)

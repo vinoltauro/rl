@@ -32,7 +32,7 @@ VALUE_COEF   = 0.5
 EPOCHS       = 10
 BATCH_SIZE   = 64
 UPDATE_FREQ  = 1024   # steps between updates — more frequent updates for sparse reward env
-N_EPISODES   = 8000
+N_EPISODES   = 12000
 MAX_STEPS    = 200
 SOLVED_AVG   = -110.0
 
