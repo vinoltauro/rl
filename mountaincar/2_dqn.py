@@ -30,12 +30,12 @@ BATCH_SIZE  = 128
 GAMMA       = 0.99
 EPS_START   = 1.0
 EPS_END     = 0.01
-EPS_DECAY   = 50000   # steps — with 400 steps/ep, epsilon stays meaningful for ~200+ episodes
+EPS_DECAY   = 50000   # steps — with 200 steps/ep, stays meaningful for ~400+ episodes
 TAU         = 0.005   # soft target update
 LR          = 5e-5    # lowered from 1e-4; Double DQN still benefits from smaller LR
 MEMORY_SIZE = 50000
-N_EPISODES  = 3000
-MAX_STEPS   = 400
+N_EPISODES  = 5000
+MAX_STEPS   = 200     # standardised to match AC/PPO and gym default
 SOLVED_AVG  = -110.0
 
 
@@ -218,7 +218,7 @@ def save_summary(episode_rewards, episode_lengths, loss_history, solve_ep, save_
         f"    Soft update tau        : {TAU}",
         f"    Replay buffer          : {MEMORY_SIZE:,}",
         f"    Max steps/episode      : {MAX_STEPS}",
-        f"    Reward shaping         : height + 100·KE - 1  (+100 at goal)",
+        f"    Reward shaping         : height + 100·KE - 1  (+10 at goal)",
         "=" * 55,
     ]
     text = '\n'.join(lines)

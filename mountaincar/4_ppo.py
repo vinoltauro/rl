@@ -32,7 +32,7 @@ VALUE_COEF   = 0.5
 EPOCHS       = 10
 BATCH_SIZE   = 64
 UPDATE_FREQ  = 1024   # steps between updates — more frequent updates for sparse reward env
-N_EPISODES   = 3000
+N_EPISODES   = 8000
 MAX_STEPS    = 200
 SOLVED_AVG   = -110.0
 
@@ -66,12 +66,13 @@ class PPOAgent:
         self._clear()
 
     def _clear(self):
-        self.states    = []
-        self.actions   = []
-        self.rewards   = []
-        self.values    = []
-        self.log_probs = []
-        self.dones     = []
+        self.states      = []
+        self.actions     = []
+        self.rewards     = []
+        self.values      = []
+        self.log_probs   = []
+        self.dones       = []
+        self.terminated  = []   # true terminal (goal reached) — bootstrap V=0
 
     def normalize_state(self, state):
         s    = np.array(state, dtype=np.float32)
@@ -89,13 +90,14 @@ class PPOAgent:
         action = dist.sample()
         return action.item(), dist.log_prob(action).item(), value.item()
 
-    def store(self, state, action, reward, log_prob, value, done):
+    def store(self, state, action, reward, log_prob, value, done, terminated):
         self.states.append(self.normalize_state(state))
         self.actions.append(action)
         self.rewards.append(reward)
         self.log_probs.append(log_prob)
         self.values.append(value)
         self.dones.append(done)
+        self.terminated.append(terminated)
 
     def update(self):
         if not self.states:
@@ -109,8 +111,12 @@ class PPOAgent:
         advantages, gae = [], 0
         values = self.values + [next_value]
         for t in reversed(range(len(self.rewards))):
-            delta = self.rewards[t] + GAMMA * values[t + 1] * (1 - self.dones[t]) - values[t]
-            gae   = delta + GAMMA * LAM * (1 - self.dones[t]) * gae
+            # Use terminated (true terminal) not done (which includes truncation).
+            # Truncated episodes should bootstrap from next_value; only true
+            # terminals (goal reached) warrant zeroing out the future.
+            not_terminal = 1 - float(self.terminated[t])
+            delta = self.rewards[t] + GAMMA * values[t + 1] * not_terminal - values[t]
+            gae   = delta + GAMMA * LAM * not_terminal * gae
             advantages.insert(0, gae)
 
         states     = torch.FloatTensor(np.array(self.states)).to(DEVICE)
@@ -193,7 +199,7 @@ def train():
             done  = terminated or truncated
             s_rew = shaped_reward(next_state[0], next_state[1], terminated)
 
-            agent.store(state, action, s_rew, log_prob, val, done)
+            agent.store(state, action, s_rew, log_prob, val, done, terminated)
             state          = next_state
             ep_raw_reward += raw_reward
             steps         += 1
@@ -287,6 +293,7 @@ def save_summary(episode_raw_rewards, episode_lengths, policy_losses, value_loss
         f"    Initialisation         : orthogonal",
         f"    State normalisation    : pos → [-1,1], vel → [-1,1]",
         f"    Reward shaping         : height + 100·KE - 1  (+10 at goal)",
+        f"    Truncation fix         : terminated vs truncated in GAE bootstrap",
         "=" * 55,
     ]
     text = '\n'.join(lines)

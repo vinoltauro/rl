@@ -25,6 +25,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Hyperparameters
 LR         = 3e-4
 GAMMA      = 0.99
+LAM        = 0.95    # GAE lambda — trades variance for bias; 0.95 is standard
 N_EPISODES = 5000
 MAX_STEPS  = 200
 SOLVED_AVG = -110.0
@@ -86,9 +87,11 @@ def train():
 
     for episode in range(N_EPISODES):
         state, _  = env.reset()
-        log_probs, values, s_rewards = [], [], []
-        raw_total = 0
-        steps     = 0
+        log_probs, values, s_rewards, step_entropies = [], [], [], []
+        raw_total  = 0
+        steps      = 0
+        terminated = False
+        truncated  = False
 
         for _ in range(MAX_STEPS):
             state_norm = normalize_state(state)
@@ -105,6 +108,7 @@ def train():
             log_probs.append(dist.log_prob(action))
             values.append(value)
             s_rewards.append(s_rew)
+            step_entropies.append(dist.entropy())   # exact H(π) per step, not noisy -log_prob
 
             state      = next_state
             raw_total += raw_reward
@@ -115,25 +119,40 @@ def train():
         episode_raw_rewards.append(raw_total)
         episode_lengths.append(steps)
 
-        returns, R = [], 0.0
-        for r in reversed(s_rewards):
-            R = r + GAMMA * R
-            returns.insert(0, R)
+        # Bootstrap: if truncated (timeout, not a real terminal), V(final_state) ≠ 0.
+        # Zeroing it out (treating timeout as terminal) underestimates all values in
+        # the episode, creating systematic bias in the critic and noisy advantages.
+        if truncated and not terminated:
+            final_norm = normalize_state(state)
+            final_t    = torch.from_numpy(final_norm).float().unsqueeze(0).to(DEVICE)
+            with torch.no_grad():
+                _, final_v = model(final_t)
+            bootstrap = final_v.item()
+        else:
+            bootstrap = 0.0
 
-        returns_t = torch.tensor(returns, dtype=torch.float32, device=DEVICE)
-        values_t  = torch.cat(values).squeeze(-1)
+        # GAE(λ=0.95): lower variance than full MC returns at the cost of a small bias.
+        # Critical for long episodes (150–200 steps) where MC variance is enormous.
+        # all_vals already encodes terminal/truncation correctly via bootstrap value.
+        # Processing a single episode backward — no cross-episode masking needed.
+        all_vals = [v.item() for v in values] + [bootstrap]
+        advantages_list, gae = [], 0.0
+        for t in reversed(range(len(s_rewards))):
+            delta = s_rewards[t] + GAMMA * all_vals[t + 1] - all_vals[t]
+            gae   = delta + GAMMA * LAM * gae
+            advantages_list.insert(0, gae)
 
-        # Compute advantages then normalise THEM — do NOT normalise returns.
-        # Critic trains on raw returns (stable, consistent scale every episode).
-        # Normalising returns instead creates a shifting target that the critic
-        # can never converge to, causing advantage explosion (actor loss ~5000).
-        advantages = returns_t - values_t.detach()
-        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        returns_list = [a + v for a, v in zip(advantages_list, [v.item() for v in values])]
+        returns_t    = torch.tensor(returns_list, dtype=torch.float32, device=DEVICE)
+        values_t     = torch.cat(values).squeeze(-1)
 
-        policy_loss = -(torch.stack(log_probs) * advantages).sum()
+        advantages_t = torch.tensor(advantages_list, dtype=torch.float32, device=DEVICE)
+        advantages_t = (advantages_t - advantages_t.mean()) / (advantages_t.std() + 1e-8)
+
+        policy_loss = -(torch.stack(log_probs) * advantages_t).sum()
         value_loss  = F.smooth_l1_loss(values_t, returns_t)
-        entropy     = -torch.stack(log_probs).mean()   # H(π) estimate, high when exploratory
-        loss        = policy_loss + value_loss - 0.01 * entropy  # matches PPO fix: enough to explore, not so much it prevents consolidation
+        entropy     = torch.stack(step_entropies).mean()   # exact entropy, not noisy -log_prob estimate
+        loss        = policy_loss + value_loss - 0.01 * entropy
 
         optimizer.zero_grad()
         loss.backward()
@@ -194,11 +213,13 @@ def save_summary(episode_raw_rewards, episode_lengths, actor_losses, critic_loss
         "  Hyperparameters",
         f"    Learning rate          : {LR}",
         f"    Gamma                  : {GAMMA}",
+        f"    GAE lambda             : {LAM}",
         f"    Gradient clip norm     : 0.5",
         f"    Network hidden         : 64 units, 2 layers (Tanh)",
         f"    Initialisation         : orthogonal",
         f"    State normalisation    : pos → [-1,1], vel → [-1,1]",
         f"    Reward shaping         : height + 100·KE - 1  (+10 at goal)",
+        f"    Entropy                : exact H(π) via dist.entropy()",
         "=" * 55,
     ]
     text = '\n'.join(lines)
