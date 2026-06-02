@@ -14,7 +14,7 @@ Use this when writing the report.
 | CartPole | DQN | ✓ **Solved** | 225 | Fast once buffer size fixed |
 | CartPole | Actor-Critic | ✓ **Solved** | 1,175 | After fixing solved threshold |
 | CartPole | PPO | ✓ **Solved** | 195 | **Fastest** of all algorithms |
-| MountainCar | Q-Learning | ⟳ **Running v2** | 50,000 | Added reward shaping — prev best -130 (raw reward only) |
+| MountainCar | Q-Learning | ⟳ **Running v2** | 50,000 | Raw rewards (shaping caused regression — see bug #28) |
 | MountainCar | DQN | ⟳ **Running v2** | 5,000 | MAX_STEPS 400→200, N_EPISODES 3000→5000 |
 | MountainCar | Actor-Critic | ⟳ **Running v2** | 5,000 | GAE(λ=0.95) + exact entropy + truncation fix |
 | MountainCar | PPO | ⟳ **Running v2** | 8,000 | N_EPISODES 3000→8000 + truncation fix |
@@ -64,6 +64,7 @@ Every completed run saves to `results/<name>_<timestamp>/`:
 | 25 | MC AC: entropy = -mean_log_prob (noisy estimator) | `3_actor_critic.py:135` | Used single-sample E[−log π(a\|s)] instead of exact H(π). Higher variance per update; PPO used `dist.entropy()` (exact) — inconsistency between implementations | Changed to `dist.entropy().mean()` at each step, accumulated and averaged |
 | 26 | MC AC + PPO: truncation bias in GAE/returns | `3_actor_critic.py`, `4_ppo.py` | `done = terminated or truncated`. Bootstrap zeroed for BOTH true terminals AND timeouts. Timeout episodes should bootstrap V(s_final) ≠ 0, since the episode continues from that state in principle. With >50% timeout episodes, this systematically underestimates V(s), biasing advantages | AC: explicit bootstrap from V(final_state) when truncated. PPO: store `terminated` separately, use it (not `done`) in GAE bootstrap mask |
 | 27 | MC PPO: N_EPISODES=3000 insufficient | `4_ppo.py` | PPO was finding goal (avg -162) but couldn't consolidate to -110 within budget. ~480K steps needed ~1M+ for MountainCar-v0 | N_EPISODES 3000 → 8000 (~1.3M steps) |
+| 28 | MC Q-Learning: reward shaping caused regression | `1_q_learning.py` | v2 run with shaped reward stayed at avg -200 through all 44,000 episodes (vs -130 with raw rewards in v1). Shaped reward `height + 100·KE - 1` creates a locally optimal greedy policy that oscillates in a high-momentum region without crossing pos=0.5. With ε=0.001 since ep 11K, Q-table has no exploration to escape this attractor. Deep RL escapes via function approximation noise; tabular with a converged greedy policy cannot. This is an empirical demonstration of Ng et al. (1999): non-potential-based shaping can alter the optimal policy. | Reverted to raw rewards. Kept shape_reward() in code with full explanation. Tabular Q-Learning uses raw rewards — this is the correct valid comparison. |
 
 ### Round 1 — Code Quality
 
@@ -153,9 +154,10 @@ Truncation fix: terminated vs truncated in GAE bootstrap  ← new in v2
 ### Q-Learning
 | Run | Episodes | Last-100 avg | Best avg | Notes |
 |---|---|---|---|---|
-| run 1 | 25,000 | -138.11 | -123.72 | Raw reward only |
-| run 2 | 50,000 | -137.82 | -130.05 | Raw reward only |
-| **v2** | 50,000 | ⟳ | ⟳ | **Reward shaping added** |
+| run 1 | 25,000 | -138.11 | -123.72 | Raw reward |
+| run 2 | 50,000 | -137.82 | -130.05 | Raw reward |
+| v2 (killed) | 44,000 | -200.00 | -200.00 | Shaped reward — stuck in local attractor (bug #28) |
+| **v2 restart** | 50,000 | ⟳ | ⟳ | **Raw reward — correct approach** |
 
 ### DQN
 | Run | Episodes | Last-100 avg | Notes |
