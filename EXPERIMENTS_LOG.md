@@ -23,9 +23,11 @@ Use this when writing the report.
 | CartPole | Actor-Critic | ✓ **Solved** | 1,175 | After fixing solved threshold |
 | CartPole | PPO | ✓ **Solved** | 195 | **Fastest** of all algorithms |
 | MountainCar | Q-Learning | ✗ Not solved | 50,000 | Best avg −130, last-100 avg −138 — confirmed tabular limit |
-| MountainCar | DQN | ⟳ **Running v3** | 5,000 | Hard target update + LR 2e-5 + goal bonus +2 |
+| MountainCar | DQN | ⟳ **Running v4** | 5,000 | Running reward normalisation (Welford) — bounds Q-values |
 | MountainCar | Actor-Critic | ✗ **Structurally fails** | 5,000 | Known single-env A2C limitation — zero-advantage fixed point. SB3 requires n_envs=16. |
-| MountainCar | PPO | ⟳ **Running v3** | 8,000 | Linear LR decay + value function clipping |
+| MountainCar | PPO | ⟳ **Running v4** | 8,000 | LR floor 5e-5 (not 0) + value clip 0.1 |
+
+**v4 runs started 2026-06-02 ~18:50 UTC** (mc_ppo_v4, mc_dqn_v4). Logs: `mc_*_v4_run.log`.
 
 **v3 runs started 2026-06-02 ~17:00 UTC** in `rl_runs` tmux (mc_dqn_v3, mc_ac_v3, mc_ppo_v3). Logs: `mc_*_v3_run.log`.
 
@@ -88,6 +90,8 @@ Every completed run saves to `results/<name>_<timestamp>/`:
 | 36 | MC AC: single optimizer causes critic to dominate | `3_actor_critic.py` | Single LR=3e-4 for both actor and critic. Critic (smooth_l1_loss over stable shaped returns) converges by ep 400 to the bad policy's V(s). With accurate critic, advantages → 0, policy gradient → 0. Actor loss = 0.000023 by ep 600, stays zero for 4,400 more episodes. System at fixed point — correct gradient, wrong policy | Separate param groups: actor LR=3e-4, critic LR=1e-4. Slower critic maintains non-zero advantages longer, giving actor meaningful signal |
 | 37 | MC AC: VALUE_COEF=1.0 amplifies critic dominance | `3_actor_critic.py` | `loss = policy_loss + value_loss`. Equal weighting means critic loss magnitude can suppress policy gradient update direction | VALUE_COEF=0.5 (Schulman 2017 standard) |
 | 38 | MC AC: ENTROPY_COEF=0.01 too low to escape fixed point | `3_actor_critic.py` | Once critic tracks bad policy, entropy term alone must maintain stochasticity. 0.01 insufficient to prevent the policy converging deterministically before finding goal | ENTROPY_COEF 0.01 → 0.02 |
+| 39 | MC PPO v3: LR decay to 0 caused entropy collapse | `4_ppo.py` | Linear decay to 0 meant LR→0 by ep 8,000. With LR≈0, even entropy bonus gradient updates → 0. Policy went fully deterministic: final entropy=0.0032 (near zero vs 0.154 in v2). Only 26 goals in 8,000 eps. Performance held at -200 last 2,500 eps. | LR floor at 5e-5: `lr = 5e-5 + 2.5e-4*(1 - ep/N)`. Also tighten value clip 0.2→0.1. |
+| 40 | MC DQN v3: Q-value scale inflates loss without collapsing performance | `2_dqn.py` | Loss 696 at ep 5,000 but last-100 avg -146.68 ± 6.31 (best stable DQN result). Loss is high because shaped rewards push Q-values into [20-50] range — correct values, not overestimation. But without normalisation, Q-value scale grows indefinitely. Eventually will cause policy degradation. | Running reward normalisation (Welford's online algorithm): z-score each shaped reward before replay buffer entry, clip ±10σ. Q-values represent normalised returns. Equivalent to SB3 VecNormalize. |
 
 ### Round 1 — Code Quality
 
@@ -138,14 +142,15 @@ Reward: raw (-1/step) — shaping reverted after bug #28 regression
 Note: shape_reward() kept in code with explanation for dissertation
 ```
 
-### MountainCar DQN (v3 — Double DQN)
+### MountainCar DQN (v4 — Double DQN)
 ```
 Network: 2 → 128 → 128 → 3  (ReLU, Huber, AdamW)
 BATCH=128, GAMMA=0.99, LR=2e-5, MEMORY=50K
-Target: hard copy every 500 steps  ← was soft TAU=0.005
+Target: hard copy every 500 steps
 Epsilon: 1.0 → 0.05 (floor) over 50,000 steps
 N_EPISODES=5,000, MAX_STEPS=200
-Reward shaping: height + 100·KE − 1  (+2 at goal)  ← was +10
+Reward shaping: height + 100·KE − 1  (+2 at goal)
+Running reward normalisation: Welford online z-score, clip ±10σ  ← NEW v4
 Double DQN: policy_net selects, target_net evaluates
 ```
 
@@ -165,12 +170,12 @@ Truncation fix: V(final_state) bootstrap on timeout
 GAE(λ=0.95) replaces full MC returns
 ```
 
-### MountainCar PPO (v3)
+### MountainCar PPO (v4)
 ```
 Network: 2 → 64 → 64 → 3  (Tanh, orthogonal init)
-LR=3e-4 → 0 linear decay over N_EPISODES  ← was fixed 3e-4
+LR: 5e-5 + 2.5e-4*(1 - ep/N) → floor 5e-5  ← v3 decayed to 0 → entropy collapse
 γ=0.99, λ=0.95, clip=0.2, entropy=0.01, VALUE_COEF=0.5
-Value function clipping: v_pred clipped within CLIP_EPS of v_old  ← new
+Value clip: 0.1 (tighter than policy clip 0.2)  ← was same as policy clip
 Update every 1,024 steps, 10 epochs, batch 64
 N_EPISODES=8,000, MAX_STEPS=200
 State normalisation: pos → [−1,1], vel → [−1,1]
@@ -199,7 +204,8 @@ Truncation fix: terminated vs truncated in GAE bootstrap
 | run 4 | 3,000 | -134 | -134 | Double DQN; MAX_STEPS=400 |
 | v2 (killed @ep250) | 250 | n/a | n/a | Killed; same bugs |
 | v2 restart | 5,000 | -143 | -200 | Found goals (avg -143 at ep 2,500) then Q-value explosion (loss 2,107) — bug #33/34/35 |
-| **v3** | 5,000 | ⟳ | ⟳ | **Hard target + LR 2e-5 + goal bonus +2** |
+| v3 | 5,000 | **-146.68** | **-146.68** | Hard target + LR 2e-5 + goal bonus +2. **Best stable DQN result.** Loss 696 but performance held — large Q-values correct not overestimated |
+| **v4** | 5,000 | ⟳ | ⟳ | **Running reward normalisation (Welford) — bounds Q-value scale** |
 
 ### Actor-Critic
 | Run | Episodes | Best avg | End avg | Notes |
@@ -221,7 +227,8 @@ Truncation fix: terminated vs truncated in GAE bootstrap
 | run 4 | 3,000 | -162 | -162 | entropy=0.01 ✓ |
 | run 5 | 3,000 | -142 | -142 | entropy=0.01 |
 | v2 | 8,000 | -148 | -200 | 3,363 goals, avg -153 stable ep 3K–5K then catastrophic regression at ep 5,300 — bugs #31/32 |
-| **v3** | 8,000 | ⟳ | ⟳ | **LR decay + value clipping** — first goal ep 43 |
+| v3 | 8,000 | ~-153 | -200 | LR decay to 0 → entropy collapse (0.0032). Only 26 goals. Policy deterministic by ep 5,000 — bug #39 |
+| **v4** | 8,000 | ⟳ | ⟳ | **LR floor 5e-5 + value clip 0.1** — first goal ep 43 |
 
 ---
 
