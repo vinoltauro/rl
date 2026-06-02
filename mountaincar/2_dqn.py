@@ -34,7 +34,7 @@ EPS_DECAY   = 50000   # steps — with 400 steps/ep, epsilon stays meaningful fo
 TAU         = 0.005   # soft target update
 LR          = 1e-4    # 1e-3 caused Q-value explosion (loss ~115K); DQN needs 1e-4
 MEMORY_SIZE = 50000
-N_EPISODES  = 1000
+N_EPISODES  = 2000
 MAX_STEPS   = 400
 SOLVED_AVG  = -110.0
 
