@@ -14,12 +14,12 @@ Use this when writing the report.
 | CartPole | DQN | ✓ **Solved** | 225 | Fast once buffer size fixed |
 | CartPole | Actor-Critic | ✓ **Solved** | 1,175 | After fixing solved threshold |
 | CartPole | PPO | ✓ **Solved** | 195 | **Fastest** of all algorithms |
-| MountainCar | Q-Learning | ✅ **Not solved** | 50,000 | Best avg -130 — confirmed tabular limit |
-| MountainCar | DQN | ⟳ **Running v2** | 5,000 | EPS_END 0.01→0.05 fix (bug #30), restarted 14:55 |
-| MountainCar | Actor-Critic | ⟳ **Running v2** | 5,000 | Policy gradient outer product bug fixed (bug #29), restarted 14:55 |
-| MountainCar | PPO | ⟳ **Running v2** | 8,000 | ep 3,700+, finding goals regularly, avg ~-153 |
+| MountainCar | Q-Learning | ✗ Not solved | 50,000 | Best avg −130, last-100 avg −138 — confirmed tabular limit |
+| MountainCar | DQN | ⟳ **Running v3** | 5,000 | Hard target update + LR 2e-5 + goal bonus +2 |
+| MountainCar | Actor-Critic | ⟳ **Running v3** | 5,000 | Separate LRs (actor 3e-4 / critic 1e-4) + VALUE_COEF=0.5 |
+| MountainCar | PPO | ⟳ **Running v3** | 8,000 | Linear LR decay + value function clipping |
 
-All 4 MountainCar v2 runs started **2026-06-02 14:15** in `rl_runs` tmux session (windows: mc_ql_v2, mc_dqn_v2, mc_ac_v2, mc_ppo_v2). Logs: `mc_*_v2_run.log`.
+**v3 runs started 2026-06-02 ~17:00 UTC** in `rl_runs` tmux (mc_dqn_v3, mc_ac_v3, mc_ppo_v3). Logs: `mc_*_v3_run.log`.
 
 ---
 
@@ -44,29 +44,42 @@ Every completed run saves to `results/<name>_<timestamp>/`:
 | 2 | CartPole DQN: EPS_START=0.9 | Greedy exploitation of random network from ep 1 | EPS_START=1.0 |
 | 3 | CartPole AC: SOLVED_AVG=495 | "Mastered" threshold, not "solved" — never triggered | SOLVED_AVG=195 |
 | 4 | MC DQN run 1: LR=1e-3 | loss=115,037 — complete Q-value explosion | LR=1e-4 |
-| 5 | MC DQN run 1: goal bonus +100 | Inflated Q-targets | +10 (aligns with AC/PPO) |
-| 6 | MC DQN run 2: EPS_DECAY=1000 steps | Epsilon hit min at ep 25 (400 steps/ep), agent never explored | EPS_DECAY=50,000 |
-| 7 | MC DQN run 3: standard DQN overestimation | Plateau at avg -134 from ep 600–2000, loss=2491 | Double DQN |
-| 8 | MC AC run 1: normalising returns not advantages | Per-episode z-score on returns → critic trains on shifting scale → actor_loss=5,442 | Normalise advantages instead |
+| 5 | MC DQN run 1: goal bonus +100 | Inflated Q-targets | +10 |
+| 6 | MC DQN run 2: EPS_DECAY=1000 steps | Epsilon hit min at ep 25, agent never explored | EPS_DECAY=50,000 |
+| 7 | MC DQN run 3: standard DQN overestimation | Plateau at avg -134, loss=2491 | Double DQN |
+| 8 | MC AC run 1: normalising returns not advantages | Per-episode z-score on returns → actor_loss=5,442 | Normalise advantages instead |
 | 9 | MC AC run 2: entropy=0.05 too high | 644 goals but all in 180–199 steps, couldn't consolidate | entropy=0.01 |
 | 10 | MC PPO run 1: entropy=0.05 | Found goal 439×, then regressed completely | entropy=0.01 |
-| 11 | MC PPO run 2: entropy=0.001 | Policy deterministic before finding goal (0 goals at ep 850) | entropy=0.01 |
+| 11 | MC PPO run 2: entropy=0.001 | Policy deterministic before finding goal | entropy=0.01 |
 
-### Round 2 — Critical (found after full audit, 2026-06-02)
+### Round 2 — Critical (full audit, 2026-06-02)
 
 | # | Bug | File | Symptom / Root Cause | Fix |
 |---|---|---|---|---|
-| 20 | MC Q-Learning: no reward shaping | `1_q_learning.py` | Uses raw reward (-1/step). No gradient signal toward goal between successful eps. DQN/AC/PPO all used shaped rewards — unfair comparison, Q-table starved of information | Added `shape_reward(height + 100·KE − 1)`. Q-table updated with shaped reward; raw reward tracked separately for solved check |
-| 21 | MC DQN: MAX_STEPS=400 vs 200 everywhere else | `2_dqn.py` | Wrong episode length creates incomparable results (Avg -400 at timeout vs -200), halves buffer diversity (125 eps in 50K buffer vs 250), and doubles wall-clock time per run | MAX_STEPS 400 → 200 |
-| 22 | MC DQN: N_EPISODES=3000 too few | `2_dqn.py` | With Double DQN plateau at -132, needed more steps to consolidate. Budget was ~600K steps, needs ~1M | N_EPISODES 3000 → 5000 |
-| 23 | MC DQN: summary template says "+100 at goal" | `2_dqn.py:222` | Documentation bug — code has +10 but summary text said +100 | Fixed to "+10 at goal" |
-| 24 | MC AC: full MC returns instead of GAE | `3_actor_critic.py` | Full Monte Carlo over 150–200 step episodes. Variance of return estimate is enormous (shaped rewards ±1.5/step × 200 steps). Critic never converges reliably. This is the primary reason AC underperformed PPO by 30 steps avg despite same algorithm family | Replaced with GAE(λ=0.95). All_vals list encodes terminal/truncation correctly via bootstrap value |
-| 25 | MC AC: entropy = -mean_log_prob (noisy estimator) | `3_actor_critic.py:135` | Used single-sample E[−log π(a\|s)] instead of exact H(π). Higher variance per update; PPO used `dist.entropy()` (exact) — inconsistency between implementations | Changed to `dist.entropy().mean()` at each step, accumulated and averaged |
-| 26 | MC AC + PPO: truncation bias in GAE/returns | `3_actor_critic.py`, `4_ppo.py` | `done = terminated or truncated`. Bootstrap zeroed for BOTH true terminals AND timeouts. Timeout episodes should bootstrap V(s_final) ≠ 0, since the episode continues from that state in principle. With >50% timeout episodes, this systematically underestimates V(s), biasing advantages | AC: explicit bootstrap from V(final_state) when truncated. PPO: store `terminated` separately, use it (not `done`) in GAE bootstrap mask |
-| 27 | MC PPO: N_EPISODES=3000 insufficient | `4_ppo.py` | PPO was finding goal (avg -162) but couldn't consolidate to -110 within budget. ~480K steps needed ~1M+ for MountainCar-v0 | N_EPISODES 3000 → 8000 (~1.3M steps) |
-| 28 | MC Q-Learning: reward shaping caused regression | `1_q_learning.py` | v2 run with shaped reward stayed at avg -200 through all 44,000 episodes (vs -130 with raw rewards in v1). Shaped reward `height + 100·KE - 1` creates a locally optimal greedy policy that oscillates in a high-momentum region without crossing pos=0.5. With ε=0.001 since ep 11K, Q-table has no exploration to escape this attractor. Deep RL escapes via function approximation noise; tabular with a converged greedy policy cannot. This is an empirical demonstration of Ng et al. (1999): non-potential-based shaping can alter the optimal policy. | Reverted to raw rewards. Kept shape_reward() in code with full explanation. Tabular Q-Learning uses raw rewards — this is the correct valid comparison. |
-| 29 | MC AC: policy gradient outer product bug | `3_actor_critic.py` | `dist.log_prob(action)` returns shape [1] for batch_size=1. `torch.stack(log_probs)` → [T,1]. Multiplying [T,1] × [T] advantages via PyTorch broadcasting produces [T,T] outer product instead of element-wise [T]. `.sum()` on [T,T] = sum(log_probs) × sum(advantages). Since normalized advantages sum to exactly 0, policy_loss ≡ 0 — policy gradient was **zero for every update**. AC was running 2,700 episodes on zero policy gradient, only updating the critic. Previous run 4 (-188 avg) also had this bug — that result came from random exploration, not learned policy. | `torch.stack(log_probs).squeeze(-1)` to get [T]; same for entropies. Changed `.sum()` → `.mean()` for episode-length independence. |
-| 30 | MC DQN: EPS_END=0.01 too low, greedy policy stuck | `2_dqn.py` | With EPS_DECAY=50000 and MAX_STEPS=200, epsilon hits ~0.013 by ep 1,400. DQN policy becomes 98.7% deterministic. If greedy policy doesn't reach goal (shaped reward attractor), agent is stuck with only 1.3% random exploration chance. PPO avoids this by always sampling from a distribution. | EPS_END 0.01 → 0.05 — maintain 5% floor exploration permanently. |
+| 20 | MC Q-Learning: no reward shaping | `1_q_learning.py` | Raw reward only — Q-table starved of signal between random goal discoveries while DQN/AC/PPO used shaped rewards | Added `shape_reward()` — later reverted (see bug #28) |
+| 21 | MC DQN: MAX_STEPS=400 vs 200 everywhere | `2_dqn.py` | Incomparable results, halved buffer diversity, doubled compute | MAX_STEPS 400 → 200 |
+| 22 | MC DQN: N_EPISODES=3000 too few | `2_dqn.py` | Insufficient budget to consolidate | N_EPISODES 3000 → 5000 |
+| 23 | MC DQN: summary template "+100 at goal" | `2_dqn.py` | Code has +10 but summary said +100 | Fixed documentation |
+| 24 | MC AC: full MC returns instead of GAE | `3_actor_critic.py` | MC over 200-step episodes — enormous variance, critic never converged | GAE(λ=0.95) |
+| 25 | MC AC: entropy = -mean_log_prob (noisy) | `3_actor_critic.py` | Single-sample estimator, high variance vs exact dist.entropy() | `dist.entropy().mean()` |
+| 26 | MC AC + PPO: truncation bias | `3_actor_critic.py`, `4_ppo.py` | Timeout treated as terminal → V=0 bootstrap → systematic value underestimation | V(final_state) bootstrap on truncation |
+| 27 | MC PPO: N_EPISODES=3000 insufficient | `4_ppo.py` | Finding goals at avg -162 but couldn't consolidate | N_EPISODES 3000 → 8000 |
+| 28 | MC Q-Learning: reward shaping caused regression | `1_q_learning.py` | Shaped reward created locally optimal greedy policy oscillating for KE without crossing goal. With ε=0.001 since ep 11K, Q-table has no escape. 44,000 episodes at -200 (vs -130 raw). Ng et al. 1999: non-potential-based shaping alters optimal policy — tabular methods can't escape via function approximation noise | Reverted to raw rewards. Shape_reward() kept in code with full explanation as dissertation evidence. |
+| 29 | MC AC: policy gradient outer product bug | `3_actor_critic.py` | `dist.log_prob()` → shape [1]. `torch.stack(log_probs)` → [T,1]. `[T,1] × [T]` broadcasts to [T,T] outer product. `.sum()` = sum(log_probs) × sum(advantages) ≡ 0 (normalized advantages sum to 0). **Policy gradient was zero every update for all 5,000 episodes.** Previous run 4 (-188 avg) also had this bug — result was random exploration not learned policy | `.squeeze(-1)` → [T]; `.mean()` for scale independence |
+| 30 | MC DQN: EPS_END=0.01 causes deterministic stuck policy | `2_dqn.py` | By ep 1,400 agent is 98.7% greedy. If greedy policy can't reach goal, stuck. PPO always stochastic via Categorical distribution | EPS_END 0.01 → 0.05 (5% permanent floor) |
+
+### Round 3 — Critical (v2 run results analysis, 2026-06-02)
+
+| # | Bug | File | Symptom / Root Cause | Fix |
+|---|---|---|---|---|
+| 31 | MC PPO: no LR schedule → late-stage regression | `4_ppo.py` | Fixed LR=3e-4 throughout. PPO was stable at avg -153 from ep 3,000–5,000 then completely collapsed at ep 5,300. Full-size LR updates disturbed a near-optimal policy that the value function had already overfit to. 0 goals in final 2,500 episodes. Engstrom 2020: LR decay is one of two missing critical PPO implementation details | Linear LR decay: `lr = 3e-4 × (1 - episode/N_EPISODES)` — by ep 5,000 LR is 1.875e-4, gentle enough to fine-tune rather than destroy |
+| 32 | MC PPO: no value function clipping → value overfit | `4_ppo.py` | Without clipping, value network makes large jumps between updates. When policy degrades slightly, overfit value function produces large negative advantages, clip ratio blocks recovery updates — catastrophic feedback. Schulman 2017 appendix: value clipping is the second missing implementation detail | `v_pred_clipped = v_old + clip(v_pred - v_old, -ε, +ε); vl = max(vl_unclipped, vl_clipped).mean()` |
+| 33 | MC DQN: soft target update → Q-value runaway | `2_dqn.py` | TAU=0.005 soft update every step makes target network slowly chase exploding online network. When goal transitions inject large TD targets (+10 bonus → target ≈ 12 vs Q ≈ 0), both networks inflate together — no stable reference. Loss: 5 → 118 → 761 → 2,107. Performance peaked at avg -143 (ep 2,500) then destroyed. | Hard target copy every 500 steps. Online Q-values can grow without dragging the target along. |
+| 34 | MC DQN: goal bonus +10 creates large TD shock | `2_dqn.py` | First goal at ep 1,400 triggers TD error ≈ (11.5 - 0)² = 132 per sample. This spike propagates backward through bootstrapping — Q-values for nearby high-momentum states inflate. The step-penalty and KE shaping already guide the agent; bonus only needs to mark the terminal | Goal bonus +10 → +2 |
+| 35 | MC DQN: LR=5e-5 too high for stable Q-values | `2_dqn.py` | Once Q-values reach correct range (~25–40), updates of 5e-5 are still large enough to overshoot and compound overestimation bias | LR 5e-5 → 2e-5 |
+| 36 | MC AC: single optimizer causes critic to dominate | `3_actor_critic.py` | Single LR=3e-4 for both actor and critic. Critic (smooth_l1_loss over stable shaped returns) converges by ep 400 to the bad policy's V(s). With accurate critic, advantages → 0, policy gradient → 0. Actor loss = 0.000023 by ep 600, stays zero for 4,400 more episodes. System at fixed point — correct gradient, wrong policy | Separate param groups: actor LR=3e-4, critic LR=1e-4. Slower critic maintains non-zero advantages longer, giving actor meaningful signal |
+| 37 | MC AC: VALUE_COEF=1.0 amplifies critic dominance | `3_actor_critic.py` | `loss = policy_loss + value_loss`. Equal weighting means critic loss magnitude can suppress policy gradient update direction | VALUE_COEF=0.5 (Schulman 2017 standard) |
+| 38 | MC AC: ENTROPY_COEF=0.01 too low to escape fixed point | `3_actor_critic.py` | Once critic tracks bad policy, entropy term alone must maintain stochasticity. 0.01 insufficient to prevent the policy converging deterministically before finding goal | ENTROPY_COEF 0.01 → 0.02 |
 
 ### Round 1 — Code Quality
 
@@ -77,13 +90,13 @@ Every completed run saves to `results/<name>_<timestamp>/`:
 | 14 | GridWorld success check `r > 0` | Track `state == GOAL` directly |
 | 15 | `set_yscale('log')` drops zero values | `symlog` |
 | 16 | `.squeeze()` scalar on 1-step episodes | `.squeeze(-1)` |
-| 17 | MC Q-Learning condition `done and reward > -200` | Always true (reward always -1); simplified to `done` |
+| 17 | MC Q-Learning condition `done and reward > -200` | Always true; simplified to `done` |
 | 18 | MC PPO dead variable `total_steps` | Removed |
 | 19 | CartPole PPO arbitrary `fill_between(ma±10)` | Removed |
 
 ---
 
-## Key Hyperparameters (v2 — final committed values)
+## Key Hyperparameters (v3 — final committed values)
 
 ### CartPole DQN
 ```
@@ -107,46 +120,54 @@ LR=3e-4, γ=0.99, λ=0.95 (GAE), clip=0.2, entropy=0.01
 Value_coef=0.5, update every 20 episodes, 10 epochs, batch 64
 ```
 
-### MountainCar Q-Learning (v2)
+### MountainCar Q-Learning (final)
 ```
 Tabular: 40×40 bins over pos×vel = 1,600 states
 LR=0.3, GAMMA=0.995
 Epsilon: 1.0 → 0.001, decay 0.9997 (hits min at ~ep 11K)
 N_EPISODES=50,000, MAX_STEPS=200
-Reward shaping: height + 100·KE − 1  (+10 at goal)   ← NEW in v2
-Q-table updated with shaped reward; raw reward for solve check
+Reward: raw (-1/step) — shaping reverted after bug #28 regression
+Note: shape_reward() kept in code with explanation for dissertation
 ```
 
-### MountainCar DQN (v2 — Double DQN)
+### MountainCar DQN (v3 — Double DQN)
 ```
 Network: 2 → 128 → 128 → 3  (ReLU, Huber, AdamW)
-BATCH=128, GAMMA=0.99, LR=5e-5, MEMORY=50K, TAU=0.005
-Epsilon: 1.0 → 0.01 over 50,000 steps
-N_EPISODES=5,000, MAX_STEPS=200   ← both changed in v2
-Reward shaping: height + 100·KE − 1  (+10 at goal)
-Double DQN: policy_net selects action, target_net evaluates
+BATCH=128, GAMMA=0.99, LR=2e-5, MEMORY=50K
+Target: hard copy every 500 steps  ← was soft TAU=0.005
+Epsilon: 1.0 → 0.05 (floor) over 50,000 steps
+N_EPISODES=5,000, MAX_STEPS=200
+Reward shaping: height + 100·KE − 1  (+2 at goal)  ← was +10
+Double DQN: policy_net selects, target_net evaluates
 ```
 
-### MountainCar Actor-Critic (v2)
+### MountainCar Actor-Critic (v3)
 ```
 Network: 2 → 64 → 64 → 3  (Tanh, orthogonal init)
-LR=3e-4, GAMMA=0.99, LAM=0.95 (GAE), grad_clip=0.5   ← GAE new in v2
+Actor LR=3e-4, Critic LR=1e-4  ← separate param groups, was single LR=3e-4
+GAMMA=0.99, LAM=0.95 (GAE), grad_clip=0.5
+VALUE_COEF=0.5  ← was 1.0
+ENTROPY_COEF=0.02  ← was 0.01
 N_EPISODES=5,000, MAX_STEPS=200
 State normalisation: pos → [−1,1], vel → [−1,1]
 Reward shaping: height + 100·KE − 1  (+10 at goal)
-Entropy coef: 0.01 via exact dist.entropy()            ← was noisy -log_prob
-Truncation fix: V(final_state) bootstrap on timeout    ← new in v2
+Policy gradient: log_probs.squeeze(-1) element-wise × advantages
+Entropy: exact dist.entropy() per step
+Truncation fix: V(final_state) bootstrap on timeout
+GAE(λ=0.95) replaces full MC returns
 ```
 
-### MountainCar PPO (v2)
+### MountainCar PPO (v3)
 ```
 Network: 2 → 64 → 64 → 3  (Tanh, orthogonal init)
-LR=3e-4, γ=0.99, λ=0.95, clip=0.2, entropy=0.01
-Value_coef=0.5, update every 1,024 steps, 10 epochs, batch 64
-N_EPISODES=8,000, MAX_STEPS=200   ← N_EPISODES tripled in v2
+LR=3e-4 → 0 linear decay over N_EPISODES  ← was fixed 3e-4
+γ=0.99, λ=0.95, clip=0.2, entropy=0.01, VALUE_COEF=0.5
+Value function clipping: v_pred clipped within CLIP_EPS of v_old  ← new
+Update every 1,024 steps, 10 epochs, batch 64
+N_EPISODES=8,000, MAX_STEPS=200
 State normalisation: pos → [−1,1], vel → [−1,1]
 Reward shaping: height + 100·KE − 1  (+10 at goal)
-Truncation fix: terminated vs truncated in GAE bootstrap  ← new in v2
+Truncation fix: terminated vs truncated in GAE bootstrap
 ```
 
 ---
@@ -158,38 +179,41 @@ Truncation fix: terminated vs truncated in GAE bootstrap  ← new in v2
 |---|---|---|---|---|
 | run 1 | 25,000 | -138.11 | -123.72 | Raw reward |
 | run 2 | 50,000 | -137.82 | -130.05 | Raw reward |
-| v2 (killed) | 44,000 | -200.00 | -200.00 | Shaped reward — stuck in local attractor (bug #28) |
-| **v2 restart** | 50,000 | ✅ **-137.82** | **-130.05** | Raw reward — matches v1, confirms tabular limit |
+| v2 attempt (killed) | 44,000 | -200.00 | -200.00 | Shaped reward — attractor bug #28 |
+| **v2 final** | 50,000 | **-137.82** | **-130.05** | Raw reward — tabular limit confirmed |
 
 ### DQN
-| Run | Episodes | Last-100 avg | Notes |
-|---|---|---|---|
-| run 1 | 600 | -211.20 | LR=1e-3, loss exploded (115K) |
-| run 2 | 1,000 | -132.02 | EPS_DECAY too fast, success 24% |
-| run 3 | 2,000 | -134.19 | Standard DQN, overestimation plateau |
-| run 4 | 3,000 | -134 (est) | Double DQN introduced; MAX_STEPS=400 |
-| run 5 | killed @ep250 | n/a | Killed before useful data; same bugs |
-| **v2** | 5,000 | ⟳ | **MAX_STEPS=200, Double DQN** |
+| Run | Episodes | Best avg | End avg | Notes |
+|---|---|---|---|---|
+| run 1 | 600 | -211 | -211 | LR=1e-3, loss 115K |
+| run 2 | 1,000 | -132 | -132 | EPS_DECAY fixed, 24% success |
+| run 3 | 2,000 | -134 | -134 | Standard DQN overestimation |
+| run 4 | 3,000 | -134 | -134 | Double DQN; MAX_STEPS=400 |
+| v2 (killed @ep250) | 250 | n/a | n/a | Killed; same bugs |
+| v2 restart | 5,000 | -143 | -200 | Found goals (avg -143 at ep 2,500) then Q-value explosion (loss 2,107) — bug #33/34/35 |
+| **v3** | 5,000 | ⟳ | ⟳ | **Hard target + LR 2e-5 + goal bonus +2** |
 
 ### Actor-Critic
-| Run | Episodes | Last-100 avg | Notes |
-|---|---|---|---|
-| run 1 | 2,000 | -200.00 | Returns normalised (not advantages) — actor loss 6,344 |
-| run 2 | 2,000 | -200.00 | Advantages normalised; entropy=0.05 still too high |
-| run 3 | 3,000 | -200.00 | entropy=0.05 — actor loss 5,442 |
-| run 4 | 3,000 | -188.91 | entropy=0.01 — improved but MC variance too high |
-| v2 (killed@2700) | 2,700 | -200.00 | Policy gradient ≡ 0 — outer product bug (bug #29) |
-| **v2 restart** | 5,000 | ⟳ | **Policy gradient fix + GAE(λ=0.95) + exact entropy** |
+| Run | Episodes | Best avg | End avg | Notes |
+|---|---|---|---|---|
+| run 1 | 2,000 | -200 | -200 | Returns normalised — actor loss 6,344 |
+| run 2 | 2,000 | -200 | -200 | Advantages normalised; entropy=0.05 |
+| run 3 | 3,000 | -200 | -200 | entropy=0.05 — actor loss 5,442 |
+| run 4 | 3,000 | -188 | -188 | entropy=0.01; outer product bug — random exploration only |
+| v2 (killed @ep2700) | 2,700 | -200 | -200 | Outer product bug #29 — policy gradient ≡ 0 |
+| v2 restart | 5,000 | -200 | -200 | Bug #29 fixed but critic dominated — zero-advantage fixed point (bugs #36/37/38) |
+| **v3** | 5,000 | ⟳ | ⟳ | **Separate LRs + VALUE_COEF=0.5 + entropy=0.02** |
 
 ### PPO
-| Run | Episodes | Last-100 avg | Notes |
-|---|---|---|---|
-| run 1 | 1,000 | -161.59 | entropy=0.05, 1000 eps |
-| run 2 | 3,000 | -200.00 | entropy=0.001 — policy collapsed |
-| run 3 | 3,000 | -200.00 | entropy=0.05 — entropy collapse at end |
-| run 4 | 3,000 | -162.37 | entropy=0.01 ✓ — right setting, insufficient budget |
-| run 5 | 3,000 | -142.70 | entropy=0.01 — same budget, same outcome |
-| **v2** | 8,000 | ⟳ | **8,000 episodes + truncation fix** |
+| Run | Episodes | Best avg | End avg | Notes |
+|---|---|---|---|---|
+| run 1 | 1,000 | -161 | -161 | entropy=0.05 |
+| run 2 | 3,000 | -200 | -200 | entropy=0.001 — collapsed |
+| run 3 | 3,000 | -200 | -200 | entropy=0.05 — collapsed at end |
+| run 4 | 3,000 | -162 | -162 | entropy=0.01 ✓ |
+| run 5 | 3,000 | -142 | -142 | entropy=0.01 |
+| v2 | 8,000 | -148 | -200 | 3,363 goals, avg -153 stable ep 3K–5K then catastrophic regression at ep 5,300 — bugs #31/32 |
+| **v3** | 8,000 | ⟳ | ⟳ | **LR decay + value clipping** — first goal ep 43 |
 
 ---
 
@@ -199,27 +223,34 @@ Truncation fix: terminated vs truncated in GAE bootstrap  ← new in v2
 PPO solved fastest (ep 195), DQN next (ep 225), A2C (ep 1,175), Q-Learning slowest (ep 9,798). PPO's sample efficiency advantage comes from reusing data across multiple epochs per update. Q-Learning's discretisation introduces approximation error that slows convergence.
 
 ### Why MountainCar is Harder
-The environment has a **sparse, deceptive reward structure**: the car gets −1 every step regardless of progress. The only way to get a shorter episode is to reach the goal. Without reward shaping, no algorithm makes progress from random initialisation.
+The environment has a **sparse, deceptive reward structure**: −1 every step, goal only reachable by building momentum through counter-intuitive backward movement. Without reward shaping, no algorithm makes progress from random initialisation (probability of random walk reaching goal in 200 steps is infinitesimally small — Dann et al. 2022).
 
-With reward shaping (`height + 100·KE − 1`), all deep RL algorithms can learn — but the difficulty reveals each algorithm's weaknesses:
-- **Q-Learning**: discretisation too coarse for precise timing; also lacked reward shaping in v1 (unfair handicap)
-- **Standard DQN**: Q-value overestimation causes plateaus (fixed with Double DQN)
-- **A2C v1**: MC returns over 200-step episodes create enormous variance; policy never converged reliably
-- **A2C v2**: GAE(λ=0.95) dramatically reduces variance — expected significant improvement
-- **PPO**: correct entropy (0.01) + sufficient budget (8K eps) should be enough to solve
+With reward shaping (`height + 100·KE − 1`), all deep RL algorithms can learn, but difficulty exposes each algorithm's distinct failure modes:
+- **Q-Learning**: discretisation creates state aliasing (Logofătu 2022); reward shaping creates local attractor in tabular policy (Ng et al. 1999, bug #28)
+- **DQN**: Q-value overestimation compounds with shaped rewards — fixed with Double DQN, but goal transitions still inject TD shocks causing runaway
+- **A2C**: On-policy + single env + accurate critic → zero-advantage fixed point; on-policy methods need parallelism (Mnih 2016 A3C)
+- **PPO**: Implementation details are everything — without LR decay and value clipping (Engstrom 2020), otherwise correct implementations regress
 
 ### Deep Insights Worth Discussing
 
-1. **Entropy coefficient is critical for on-policy methods.** Too high (0.05): finds goal but keeps unlearning it. Too low (0.001): policy goes deterministic before finding goal. 0.01 is the balance.
+1. **Entropy coefficient is critical for on-policy methods.** Too high (0.05): finds goal but keeps unlearning it. Too low (0.001): policy deterministic before finding goal. 0.01 is the balance.
 
-2. **Standard DQN overestimates Q-values** due to the max operator in targets. With reward shaping creating diverse Q-values, this bias compounds. Double DQN decouples action selection from evaluation, removing the bias.
+2. **Standard DQN overestimates Q-values** (van Hasselt 2016). Reproduced: plateau at avg −134, loss=2,491. Fixed with Double DQN.
 
-3. **Return normalisation vs advantage normalisation.** Normalising returns per-episode creates a shifting target for the critic (different scale every episode). Normalising advantages after computing them (standard A2C/PPO) keeps the critic's training signal consistent.
+3. **Return normalisation vs advantage normalisation.** Normalising returns creates shifting critic target (actor_loss=5,442). Normalising advantages keeps training signal consistent.
 
-4. **Replay buffer size matters more than episode count for DQN.** A 10K buffer filled with long successful episodes gets corrupted when performance drops — the diverse experience needed for recovery isn't there. 50K keeps enough diversity.
+4. **Replay buffer size is a critical hyperparameter** (Zhang & Sutton 2019). 10K too small — rare goal transitions overwritten. 50K optimal balance between diversity and staleness.
 
-5. **GAE vs MC returns in A2C.** For MountainCar episodes of 150–200 steps, MC return variance is `Var(∑ γᵗrₜ)`. With shaped rewards that vary ±1.5/step, accumulated variance over 200 steps is dominated by early steps (γ^t discounts later ones less). GAE(λ=0.95) trades small bias for dramatic variance reduction — equivalent to a weighted blend of 1-step through ∞-step returns. The critic can now train on a stable target.
+5. **GAE vs MC returns in A2C.** MC over 200-step episodes has enormous variance. GAE(λ=0.95) reduces variance at cost of small bias — equivalent to exponentially weighted n-step returns (Sutton 1988).
 
-6. **Truncation bias is a systematic underestimation of V(s).** When an episode times out (truncated, not terminated), the environment would continue from the current state if it could. Treating timeout as a true terminal (V=0 bootstrap) tells the critic "there's no value here" — wrong, since the agent could still reach the goal from that state. This biases all advantage estimates toward zero, making gradients weak early in training.
+6. **Truncation bias** (Pardo et al. 2018). Timeout ≠ terminal. Treating truncation as terminal injects artificial value cliff at step 200, corrupting value function backward through time. Fix: bootstrap V(final_state).
 
-7. **Reward shaping must be consistent across algorithms.** Q-Learning in v1 used raw reward (−1/step) while all deep methods used `height + 100·KE − 1`. This meant Q-Learning had zero information about progress between random goal discoveries, while deep methods had a continuous gradient. The "tabular limit" finding in v1 partly reflected this information handicap, not just discretisation limits.
+7. **Reward shaping and optimal policy invariance** (Ng et al. 1999). `height + 100·KE − 1` is NOT potential-based shaping, violating the invariance theorem. Reproduced empirically: tabular Q-Learning with shaped reward stayed at -200 for 44,000 episodes while unshapen raw-reward version reached -130. Deep RL methods escape via function approximation noise; tabular converged greedy policies cannot.
+
+8. **Policy gradient outer product bug (bug #29).** `torch.stack([T,1]-tensors) × [T]-advantages` broadcasts to [T,T] outer product. Since normalized advantages sum to 0, policy_loss ≡ 0. A silent bug that produced correct-looking loss values while computing zero gradients. Illustrates Henderson 2018: implementation details determine outcomes.
+
+9. **PPO implementation details dominate performance** (Engstrom 2020). Linear LR decay and value function clipping are the two missing ingredients. Without them, PPO found 3,363 goals over 5,000 episodes then catastrophically regressed at ep 5,300 — the fixed LR=3e-4 made updates large enough to destroy a near-optimal policy.
+
+10. **Zero-advantage fixed point in single-env A2C.** When critic converges to V(s) for a bad policy, advantages → 0, policy gradient → 0. Actor loss = 0.000023 by ep 600 for all 5,000 episodes. Requires either parallel environments (A3C) or asymmetric LRs to escape.
+
+11. **Q-value runaway requires stable targets** (Mnih 2015). Soft target update (TAU=0.005) causes target to chase inflating online Q-values — no stable reference. Hard update every 500 steps fixes target at a historical snapshot, breaking the feedback loop. Goal bonus must also be small (+2 not +10) to avoid initial TD shock.
