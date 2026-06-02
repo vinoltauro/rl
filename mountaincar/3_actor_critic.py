@@ -25,7 +25,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Hyperparameters
 LR         = 3e-4
 GAMMA      = 0.99
-N_EPISODES = 2000
+N_EPISODES = 3000
 MAX_STEPS  = 200
 SOLVED_AVG = -110.0
 

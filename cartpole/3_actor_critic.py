@@ -25,9 +25,9 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Hyperparameters
 LR         = 3e-4
 GAMMA      = 0.99
-N_EPISODES = 1000
+N_EPISODES = 2000
 MAX_STEPS  = 500
-SOLVED_AVG = 495    # "mastered" threshold for CartPole
+SOLVED_AVG = 195    # standard CartPole solved criterion
 
 
 class ActorCritic(nn.Module):

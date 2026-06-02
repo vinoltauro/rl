@@ -26,15 +26,15 @@ plt.rcParams.update(PLT_STYLE)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Hyperparameters
-BATCH_SIZE  = 64
+BATCH_SIZE  = 128
 GAMMA       = 0.99
 EPS_START   = 1.0
 EPS_END     = 0.01
 EPS_DECAY   = 10000   # steps — slow enough to explore MountainCar adequately
 TAU         = 0.005   # soft target update
-LR          = 1e-3
-MEMORY_SIZE = 20000
-N_EPISODES  = 600
+LR          = 1e-4    # 1e-3 caused Q-value explosion (loss ~115K); DQN needs 1e-4
+MEMORY_SIZE = 50000
+N_EPISODES  = 1000
 MAX_STEPS   = 400
 SOLVED_AVG  = -110.0
 
@@ -58,7 +58,7 @@ def shape_reward(pos, vel, terminated):
     ke     = vel * vel                   # kinetic energy proxy
     reward = height + 100.0 * ke - 1.0  # step penalty encourages efficiency
     if terminated and pos >= 0.5:
-        reward += 100.0
+        reward += 10.0   # align with AC/PPO; +100 inflated Q-targets and caused divergence
     return reward
 
 
@@ -114,7 +114,7 @@ def train():
     target_net = DQN(n_obs, n_actions).to(DEVICE)
     target_net.load_state_dict(policy_net.state_dict())
 
-    optimizer = optim.Adam(policy_net.parameters(), lr=LR)
+    optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
     memory    = deque(maxlen=MEMORY_SIZE)
 
     episode_rewards = []

@@ -109,7 +109,7 @@ class PPOAgent:
 
         advantages, returns = self.compute_gae(next_value.item())
 
-        states     = torch.FloatTensor(self.states).to(DEVICE)
+        states     = torch.FloatTensor(np.array(self.states)).to(DEVICE)
         actions    = torch.LongTensor(self.actions).to(DEVICE)
         old_lp     = torch.FloatTensor(self.log_probs).to(DEVICE)
         advantages = torch.FloatTensor(advantages).to(DEVICE)

@@ -29,13 +29,13 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Hyperparameters
 BATCH_SIZE  = 128
 GAMMA       = 0.99
-EPS_START   = 0.9
+EPS_START   = 1.0     # full exploration at start
 EPS_END     = 0.05
-EPS_DECAY   = 1000    # steps
+EPS_DECAY   = 5000    # steps — slower decay prevents premature exploitation
 TAU         = 0.005   # soft target update
 LR          = 1e-4
-MEMORY_SIZE = 10000
-N_EPISODES  = 600
+MEMORY_SIZE = 50000   # larger buffer — prevents Q-value divergence from correlated data
+N_EPISODES  = 1000
 SOLVED_AVG  = 195
 
 
@@ -195,7 +195,7 @@ def save_summary(episode_rewards, loss_history, solve_ep, save_dir):
         f"    Learning rate          : {LR}",
         f"    Epsilon                : {EPS_START} → {EPS_END}  (decay steps: {EPS_DECAY})",
         f"    Soft update tau        : {TAU}",
-        f"    Replay buffer size     : {MEMORY_SIZE:,}",
+        f"    Replay buffer size     : {MEMORY_SIZE:,}  (large buffer prevents Q-value divergence)",
         f"    Network                : 4 → 128 → 128 → 2  (ReLU, Huber loss, AdamW)",
         "=" * 55,
     ]

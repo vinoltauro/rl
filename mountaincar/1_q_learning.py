@@ -24,8 +24,8 @@ LR         = 0.3
 GAMMA      = 0.995
 EPS_START  = 1.0
 EPS_MIN    = 0.001
-EPS_DECAY  = 0.9995
-N_EPISODES = 25000
+EPS_DECAY  = 0.9997   # slower decay — hits EPS_MIN at ~ep 11K, better exploration budget
+N_EPISODES = 50000
 MAX_STEPS  = 200
 SOLVED_AVG = -110.0
 

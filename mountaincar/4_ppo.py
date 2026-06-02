@@ -31,8 +31,8 @@ ENTROPY_COEF = 0.05
 VALUE_COEF   = 0.5
 EPOCHS       = 10
 BATCH_SIZE   = 64
-UPDATE_FREQ  = 2048   # steps between updates
-N_EPISODES   = 1000
+UPDATE_FREQ  = 1024   # steps between updates — more frequent updates for sparse reward env
+N_EPISODES   = 3000
 MAX_STEPS    = 200
 SOLVED_AVG   = -110.0
 

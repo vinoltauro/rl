@@ -1,0 +1,61 @@
+CartPole Q-Learning
+==================================================
+Episode   500 | Avg(100): 134.98 | Epsilon: 0.082
+Episode  1000 | Avg(100): 121.89 | Epsilon: 0.010
+Episode  1500 | Avg(100): 131.28 | Epsilon: 0.010
+Episode  2000 | Avg(100): 152.94 | Epsilon: 0.010
+Episode  2500 | Avg(100): 107.58 | Epsilon: 0.010
+Episode  3000 | Avg(100): 122.41 | Epsilon: 0.010
+Episode  3500 | Avg(100): 117.82 | Epsilon: 0.010
+Episode  4000 | Avg(100): 158.49 | Epsilon: 0.010
+Episode  4500 | Avg(100): 107.09 | Epsilon: 0.010
+Episode  5000 | Avg(100): 110.83 | Epsilon: 0.010
+Episode  5500 | Avg(100): 169.51 | Epsilon: 0.010
+Episode  6000 | Avg(100): 166.77 | Epsilon: 0.010
+Episode  6500 | Avg(100): 164.15 | Epsilon: 0.010
+Episode  7000 | Avg(100): 174.53 | Epsilon: 0.010
+Episode  7500 | Avg(100): 149.40 | Epsilon: 0.010
+Episode  8000 | Avg(100): 186.28 | Epsilon: 0.010
+Episode  8500 | Avg(100): 161.96 | Epsilon: 0.010
+Episode  9000 | Avg(100): 132.66 | Epsilon: 0.010
+Episode  9500 | Avg(100): 182.81 | Epsilon: 0.010
+
+Solved at episode 9798! Avg(100): 195.03
+Saved: results/cartpole_qlearning_20260602_103536/training_log.csv
+
+=======================================================
+TRAINING SUMMARY — CartPole Q-Learning
+=======================================================
+  Episodes trained         : 9,798
+  Solved at episode        : 9798
+  Mean reward (all)        : 139.48 ± 43.32
+  Mean reward (last 100)   : 195.03 ± 36.80
+  Best single episode      : 500
+  Success rate (last 100)  : 41 / 100  (41.0%)
+
+  Hyperparameters
+    Alpha (LR)             : 0.1
+    Gamma                  : 0.99
+    Epsilon start → min    : 1.0 → 0.01  (decay 0.995)
+    Bins per dim           : [10, 10, 20, 20]  →  40,000 states
+    Solved threshold       : avg ≥ 195 over 100 episodes
+=======================================================
+Saved: results/cartpole_qlearning_20260602_103536/summary.txt
+Saved: results/cartpole_qlearning_20260602_103536/training_results.png
+
+Testing trained agent (10 episodes, ε=0)...
+  ✓ Test  1: 206 steps
+  ✗ Test  2: 170 steps
+  ✗ Test  3: 176 steps
+  ✓ Test  4: 211 steps
+  ✓ Test  5: 213 steps
+  ✗ Test  6: 171 steps
+  ✓ Test  7: 210 steps
+  ✓ Test  8: 199 steps
+  ✗ Test  9: 187 steps
+  ✗ Test 10: 188 steps
+
+  Average : 193.10 ± 16.07
+  Result  : Needs more training
+
+Results saved to: results/cartpole_qlearning_20260602_103536/

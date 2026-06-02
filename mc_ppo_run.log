@@ -1,0 +1,364 @@
+MountainCar PPO | Device: cuda
+=======================================================
+Episode   50 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode  100 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode  150 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode  200 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode  250 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode  300 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode  350 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+  >>> Episode 371 REACHED GOAL in 198 steps!
+  >>> Episode 377 REACHED GOAL in 198 steps!
+  >>> Episode 384 REACHED GOAL in 198 steps!
+  >>> Episode 395 REACHED GOAL in 198 steps!
+  >>> Episode 397 REACHED GOAL in 198 steps!
+Episode  400 | Avg raw(100): -199.90 | Success:   0/100 | Steps: 200
+  >>> Episode 423 REACHED GOAL in 138 steps!
+Episode  450 | Avg raw(100): -199.28 | Success:   0/100 | Steps: 200
+  >>> Episode 455 REACHED GOAL in 140 steps!
+  >>> Episode 457 REACHED GOAL in 198 steps!
+  >>> Episode 458 REACHED GOAL in 196 steps!
+  >>> Episode 460 REACHED GOAL in 197 steps!
+  >>> Episode 484 REACHED GOAL in 133 steps!
+  >>> Episode 485 REACHED GOAL in 199 steps!
+  >>> Episode 486 REACHED GOAL in 198 steps!
+Episode  500 | Avg raw(100): -197.99 | Success:   0/100 | Steps: 200
+  >>> Episode 508 REACHED GOAL in 197 steps!
+  >>> Episode 510 REACHED GOAL in 130 steps!
+  >>> Episode 513 REACHED GOAL in 198 steps!
+  >>> Episode 518 REACHED GOAL in 127 steps!
+  >>> Episode 521 REACHED GOAL in 198 steps!
+  >>> Episode 522 REACHED GOAL in 128 steps!
+  >>> Episode 523 REACHED GOAL in 199 steps!
+  >>> Episode 534 REACHED GOAL in 136 steps!
+  >>> Episode 536 REACHED GOAL in 194 steps!
+  >>> Episode 537 REACHED GOAL in 198 steps!
+  >>> Episode 538 REACHED GOAL in 125 steps!
+  >>> Episode 541 REACHED GOAL in 198 steps!
+  >>> Episode 547 REACHED GOAL in 130 steps!
+  >>> Episode 548 REACHED GOAL in 193 steps!
+  >>> Episode 549 REACHED GOAL in 199 steps!
+Episode  550 | Avg raw(100): -194.07 | Success:   0/100 | Steps: 196
+  >>> Episode 550 REACHED GOAL in 196 steps!
+  >>> Episode 551 REACHED GOAL in 145 steps!
+  >>> Episode 555 REACHED GOAL in 198 steps!
+  >>> Episode 559 REACHED GOAL in 188 steps!
+  >>> Episode 563 REACHED GOAL in 195 steps!
+  >>> Episode 570 REACHED GOAL in 198 steps!
+  >>> Episode 572 REACHED GOAL in 197 steps!
+  >>> Episode 575 REACHED GOAL in 199 steps!
+  >>> Episode 579 REACHED GOAL in 199 steps!
+  >>> Episode 580 REACHED GOAL in 195 steps!
+  >>> Episode 581 REACHED GOAL in 196 steps!
+  >>> Episode 582 REACHED GOAL in 155 steps!
+  >>> Episode 586 REACHED GOAL in 126 steps!
+  >>> Episode 588 REACHED GOAL in 132 steps!
+  >>> Episode 589 REACHED GOAL in 127 steps!
+  >>> Episode 591 REACHED GOAL in 195 steps!
+  >>> Episode 592 REACHED GOAL in 130 steps!
+  >>> Episode 593 REACHED GOAL in 196 steps!
+  >>> Episode 594 REACHED GOAL in 128 steps!
+  >>> Episode 595 REACHED GOAL in 125 steps!
+  >>> Episode 599 REACHED GOAL in 195 steps!
+Episode  600 | Avg raw(100): -189.56 | Success:   0/100 | Steps: 191
+  >>> Episode 600 REACHED GOAL in 191 steps!
+  >>> Episode 603 REACHED GOAL in 194 steps!
+  >>> Episode 604 REACHED GOAL in 183 steps!
+  >>> Episode 607 REACHED GOAL in 128 steps!
+  >>> Episode 608 REACHED GOAL in 192 steps!
+  >>> Episode 609 REACHED GOAL in 199 steps!
+  >>> Episode 614 REACHED GOAL in 150 steps!
+  >>> Episode 617 REACHED GOAL in 127 steps!
+  >>> Episode 618 REACHED GOAL in 121 steps!
+  >>> Episode 619 REACHED GOAL in 122 steps!
+  >>> Episode 620 REACHED GOAL in 184 steps!
+  >>> Episode 622 REACHED GOAL in 179 steps!
+  >>> Episode 627 REACHED GOAL in 119 steps!
+  >>> Episode 628 REACHED GOAL in 198 steps!
+  >>> Episode 632 REACHED GOAL in 121 steps!
+  >>> Episode 633 REACHED GOAL in 129 steps!
+  >>> Episode 634 REACHED GOAL in 124 steps!
+  >>> Episode 635 REACHED GOAL in 123 steps!
+  >>> Episode 639 REACHED GOAL in 169 steps!
+  >>> Episode 640 REACHED GOAL in 190 steps!
+  >>> Episode 642 REACHED GOAL in 125 steps!
+  >>> Episode 646 REACHED GOAL in 125 steps!
+  >>> Episode 649 REACHED GOAL in 126 steps!
+Episode  650 | Avg raw(100): -183.38 | Success:   0/100 | Steps: 200
+  >>> Episode 655 REACHED GOAL in 199 steps!
+  >>> Episode 656 REACHED GOAL in 188 steps!
+  >>> Episode 657 REACHED GOAL in 139 steps!
+  >>> Episode 660 REACHED GOAL in 128 steps!
+  >>> Episode 661 REACHED GOAL in 183 steps!
+  >>> Episode 663 REACHED GOAL in 131 steps!
+  >>> Episode 664 REACHED GOAL in 196 steps!
+  >>> Episode 665 REACHED GOAL in 175 steps!
+  >>> Episode 667 REACHED GOAL in 167 steps!
+  >>> Episode 668 REACHED GOAL in 135 steps!
+  >>> Episode 670 REACHED GOAL in 124 steps!
+  >>> Episode 671 REACHED GOAL in 191 steps!
+  >>> Episode 672 REACHED GOAL in 159 steps!
+  >>> Episode 674 REACHED GOAL in 199 steps!
+  >>> Episode 676 REACHED GOAL in 160 steps!
+  >>> Episode 678 REACHED GOAL in 121 steps!
+  >>> Episode 680 REACHED GOAL in 126 steps!
+  >>> Episode 681 REACHED GOAL in 127 steps!
+  >>> Episode 682 REACHED GOAL in 122 steps!
+  >>> Episode 683 REACHED GOAL in 139 steps!
+  >>> Episode 684 REACHED GOAL in 197 steps!
+  >>> Episode 685 REACHED GOAL in 132 steps!
+  >>> Episode 687 REACHED GOAL in 172 steps!
+  >>> Episode 690 REACHED GOAL in 149 steps!
+  >>> Episode 692 REACHED GOAL in 199 steps!
+  >>> Episode 693 REACHED GOAL in 165 steps!
+  >>> Episode 695 REACHED GOAL in 199 steps!
+Episode  700 | Avg raw(100): -178.50 | Success:   0/100 | Steps: 200
+  >>> Episode 701 REACHED GOAL in 129 steps!
+  >>> Episode 702 REACHED GOAL in 135 steps!
+  >>> Episode 703 REACHED GOAL in 158 steps!
+  >>> Episode 704 REACHED GOAL in 125 steps!
+  >>> Episode 705 REACHED GOAL in 196 steps!
+  >>> Episode 707 REACHED GOAL in 193 steps!
+  >>> Episode 714 REACHED GOAL in 190 steps!
+  >>> Episode 715 REACHED GOAL in 128 steps!
+  >>> Episode 717 REACHED GOAL in 131 steps!
+  >>> Episode 719 REACHED GOAL in 167 steps!
+  >>> Episode 720 REACHED GOAL in 142 steps!
+  >>> Episode 721 REACHED GOAL in 199 steps!
+  >>> Episode 722 REACHED GOAL in 123 steps!
+  >>> Episode 724 REACHED GOAL in 125 steps!
+  >>> Episode 725 REACHED GOAL in 126 steps!
+  >>> Episode 726 REACHED GOAL in 131 steps!
+  >>> Episode 727 REACHED GOAL in 130 steps!
+  >>> Episode 728 REACHED GOAL in 139 steps!
+  >>> Episode 729 REACHED GOAL in 196 steps!
+  >>> Episode 731 REACHED GOAL in 129 steps!
+  >>> Episode 732 REACHED GOAL in 125 steps!
+  >>> Episode 733 REACHED GOAL in 140 steps!
+  >>> Episode 734 REACHED GOAL in 125 steps!
+  >>> Episode 736 REACHED GOAL in 126 steps!
+  >>> Episode 737 REACHED GOAL in 139 steps!
+  >>> Episode 738 REACHED GOAL in 139 steps!
+  >>> Episode 739 REACHED GOAL in 133 steps!
+  >>> Episode 740 REACHED GOAL in 121 steps!
+  >>> Episode 741 REACHED GOAL in 129 steps!
+  >>> Episode 743 REACHED GOAL in 126 steps!
+Episode  750 | Avg raw(100): -171.56 | Success:   0/100 | Steps: 139
+  >>> Episode 750 REACHED GOAL in 139 steps!
+  >>> Episode 752 REACHED GOAL in 120 steps!
+  >>> Episode 753 REACHED GOAL in 195 steps!
+  >>> Episode 754 REACHED GOAL in 193 steps!
+  >>> Episode 757 REACHED GOAL in 199 steps!
+  >>> Episode 758 REACHED GOAL in 124 steps!
+  >>> Episode 761 REACHED GOAL in 127 steps!
+  >>> Episode 762 REACHED GOAL in 128 steps!
+  >>> Episode 763 REACHED GOAL in 130 steps!
+  >>> Episode 765 REACHED GOAL in 119 steps!
+  >>> Episode 767 REACHED GOAL in 120 steps!
+  >>> Episode 768 REACHED GOAL in 133 steps!
+  >>> Episode 774 REACHED GOAL in 126 steps!
+  >>> Episode 775 REACHED GOAL in 175 steps!
+  >>> Episode 777 REACHED GOAL in 129 steps!
+  >>> Episode 781 REACHED GOAL in 188 steps!
+  >>> Episode 785 REACHED GOAL in 196 steps!
+  >>> Episode 789 REACHED GOAL in 195 steps!
+  >>> Episode 793 REACHED GOAL in 123 steps!
+  >>> Episode 794 REACHED GOAL in 122 steps!
+  >>> Episode 795 REACHED GOAL in 198 steps!
+  >>> Episode 796 REACHED GOAL in 119 steps!
+  >>> Episode 797 REACHED GOAL in 131 steps!
+  >>> Episode 799 REACHED GOAL in 197 steps!
+Episode  800 | Avg raw(100): -171.21 | Success:   0/100 | Steps: 200
+  >>> Episode 807 REACHED GOAL in 126 steps!
+  >>> Episode 808 REACHED GOAL in 197 steps!
+  >>> Episode 810 REACHED GOAL in 124 steps!
+  >>> Episode 811 REACHED GOAL in 123 steps!
+  >>> Episode 812 REACHED GOAL in 158 steps!
+  >>> Episode 814 REACHED GOAL in 129 steps!
+  >>> Episode 817 REACHED GOAL in 199 steps!
+  >>> Episode 818 REACHED GOAL in 199 steps!
+  >>> Episode 819 REACHED GOAL in 137 steps!
+  >>> Episode 820 REACHED GOAL in 122 steps!
+  >>> Episode 821 REACHED GOAL in 193 steps!
+  >>> Episode 824 REACHED GOAL in 188 steps!
+  >>> Episode 825 REACHED GOAL in 121 steps!
+  >>> Episode 827 REACHED GOAL in 134 steps!
+  >>> Episode 829 REACHED GOAL in 123 steps!
+  >>> Episode 833 REACHED GOAL in 189 steps!
+  >>> Episode 834 REACHED GOAL in 195 steps!
+  >>> Episode 837 REACHED GOAL in 158 steps!
+  >>> Episode 838 REACHED GOAL in 192 steps!
+  >>> Episode 840 REACHED GOAL in 122 steps!
+  >>> Episode 841 REACHED GOAL in 196 steps!
+  >>> Episode 843 REACHED GOAL in 197 steps!
+  >>> Episode 844 REACHED GOAL in 134 steps!
+  >>> Episode 848 REACHED GOAL in 122 steps!
+Episode  850 | Avg raw(100): -177.86 | Success:   0/100 | Steps: 121
+  >>> Episode 850 REACHED GOAL in 121 steps!
+  >>> Episode 854 REACHED GOAL in 128 steps!
+  >>> Episode 855 REACHED GOAL in 195 steps!
+  >>> Episode 859 REACHED GOAL in 189 steps!
+  >>> Episode 861 REACHED GOAL in 199 steps!
+  >>> Episode 863 REACHED GOAL in 188 steps!
+  >>> Episode 864 REACHED GOAL in 120 steps!
+  >>> Episode 867 REACHED GOAL in 196 steps!
+  >>> Episode 868 REACHED GOAL in 123 steps!
+  >>> Episode 871 REACHED GOAL in 119 steps!
+  >>> Episode 876 REACHED GOAL in 199 steps!
+  >>> Episode 877 REACHED GOAL in 196 steps!
+  >>> Episode 878 REACHED GOAL in 193 steps!
+  >>> Episode 879 REACHED GOAL in 191 steps!
+  >>> Episode 880 REACHED GOAL in 194 steps!
+  >>> Episode 884 REACHED GOAL in 127 steps!
+  >>> Episode 885 REACHED GOAL in 192 steps!
+  >>> Episode 886 REACHED GOAL in 193 steps!
+  >>> Episode 888 REACHED GOAL in 122 steps!
+  >>> Episode 890 REACHED GOAL in 124 steps!
+  >>> Episode 893 REACHED GOAL in 121 steps!
+  >>> Episode 894 REACHED GOAL in 189 steps!
+  >>> Episode 896 REACHED GOAL in 197 steps!
+  >>> Episode 897 REACHED GOAL in 123 steps!
+  >>> Episode 898 REACHED GOAL in 195 steps!
+  >>> Episode 899 REACHED GOAL in 194 steps!
+Episode  900 | Avg raw(100): -181.04 | Success:   0/100 | Steps: 198
+  >>> Episode 900 REACHED GOAL in 198 steps!
+  >>> Episode 901 REACHED GOAL in 191 steps!
+  >>> Episode 902 REACHED GOAL in 120 steps!
+  >>> Episode 903 REACHED GOAL in 195 steps!
+  >>> Episode 904 REACHED GOAL in 189 steps!
+  >>> Episode 905 REACHED GOAL in 192 steps!
+  >>> Episode 906 REACHED GOAL in 194 steps!
+  >>> Episode 909 REACHED GOAL in 199 steps!
+  >>> Episode 913 REACHED GOAL in 156 steps!
+  >>> Episode 914 REACHED GOAL in 152 steps!
+  >>> Episode 916 REACHED GOAL in 123 steps!
+  >>> Episode 917 REACHED GOAL in 124 steps!
+  >>> Episode 918 REACHED GOAL in 122 steps!
+  >>> Episode 919 REACHED GOAL in 193 steps!
+  >>> Episode 920 REACHED GOAL in 118 steps!
+  >>> Episode 922 REACHED GOAL in 187 steps!
+  >>> Episode 924 REACHED GOAL in 125 steps!
+  >>> Episode 925 REACHED GOAL in 127 steps!
+  >>> Episode 926 REACHED GOAL in 120 steps!
+  >>> Episode 928 REACHED GOAL in 192 steps!
+  >>> Episode 929 REACHED GOAL in 191 steps!
+  >>> Episode 930 REACHED GOAL in 136 steps!
+  >>> Episode 931 REACHED GOAL in 193 steps!
+  >>> Episode 932 REACHED GOAL in 192 steps!
+  >>> Episode 934 REACHED GOAL in 186 steps!
+  >>> Episode 935 REACHED GOAL in 127 steps!
+  >>> Episode 937 REACHED GOAL in 121 steps!
+  >>> Episode 938 REACHED GOAL in 148 steps!
+  >>> Episode 939 REACHED GOAL in 121 steps!
+  >>> Episode 940 REACHED GOAL in 122 steps!
+  >>> Episode 942 REACHED GOAL in 121 steps!
+  >>> Episode 943 REACHED GOAL in 128 steps!
+  >>> Episode 944 REACHED GOAL in 128 steps!
+  >>> Episode 945 REACHED GOAL in 119 steps!
+  >>> Episode 946 REACHED GOAL in 189 steps!
+  >>> Episode 948 REACHED GOAL in 152 steps!
+  >>> Episode 949 REACHED GOAL in 120 steps!
+Episode  950 | Avg raw(100): -175.10 | Success:   0/100 | Steps: 192
+  >>> Episode 950 REACHED GOAL in 192 steps!
+  >>> Episode 951 REACHED GOAL in 120 steps!
+  >>> Episode 952 REACHED GOAL in 116 steps!
+  >>> Episode 953 REACHED GOAL in 119 steps!
+  >>> Episode 954 REACHED GOAL in 194 steps!
+  >>> Episode 955 REACHED GOAL in 184 steps!
+  >>> Episode 958 REACHED GOAL in 189 steps!
+  >>> Episode 959 REACHED GOAL in 190 steps!
+  >>> Episode 961 REACHED GOAL in 125 steps!
+  >>> Episode 962 REACHED GOAL in 118 steps!
+  >>> Episode 963 REACHED GOAL in 119 steps!
+  >>> Episode 964 REACHED GOAL in 149 steps!
+  >>> Episode 966 REACHED GOAL in 149 steps!
+  >>> Episode 967 REACHED GOAL in 119 steps!
+  >>> Episode 968 REACHED GOAL in 192 steps!
+  >>> Episode 969 REACHED GOAL in 118 steps!
+  >>> Episode 970 REACHED GOAL in 118 steps!
+  >>> Episode 971 REACHED GOAL in 120 steps!
+  >>> Episode 972 REACHED GOAL in 125 steps!
+  >>> Episode 973 REACHED GOAL in 156 steps!
+  >>> Episode 974 REACHED GOAL in 126 steps!
+  >>> Episode 975 REACHED GOAL in 189 steps!
+  >>> Episode 976 REACHED GOAL in 193 steps!
+  >>> Episode 977 REACHED GOAL in 127 steps!
+  >>> Episode 978 REACHED GOAL in 128 steps!
+  >>> Episode 979 REACHED GOAL in 115 steps!
+  >>> Episode 983 REACHED GOAL in 185 steps!
+  >>> Episode 984 REACHED GOAL in 117 steps!
+  >>> Episode 986 REACHED GOAL in 121 steps!
+  >>> Episode 987 REACHED GOAL in 116 steps!
+  >>> Episode 988 REACHED GOAL in 123 steps!
+  >>> Episode 989 REACHED GOAL in 178 steps!
+  >>> Episode 990 REACHED GOAL in 197 steps!
+  >>> Episode 993 REACHED GOAL in 118 steps!
+  >>> Episode 994 REACHED GOAL in 170 steps!
+  >>> Episode 995 REACHED GOAL in 189 steps!
+  >>> Episode 996 REACHED GOAL in 184 steps!
+  >>> Episode 997 REACHED GOAL in 117 steps!
+  >>> Episode 999 REACHED GOAL in 124 steps!
+Episode 1000 | Avg raw(100): -161.59 | Success:   0/100 | Steps: 117
+  >>> Episode 1000 REACHED GOAL in 117 steps!
+Saved: results/mountaincar_ppo_20260602_103539/training_log.csv
+Saved: results/mountaincar_ppo_20260602_103539/update_log.csv
+
+=======================================================
+TRAINING SUMMARY — MountainCar PPO
+=======================================================
+  Episodes trained         : 1,000
+  Policy updates           : 91
+  Solved at episode        : Not solved
+  Mean reward (all)        : -187.98 ± 25.98
+  Mean reward (last 100)   : -161.59 ± 35.38
+  Success rate (last 100)  : 0 / 100  (0.0%)
+  Mean steps (last 100)    : 161.6
+  Final policy loss        : -0.003238
+  Final value loss         : 1.654454
+  Final entropy            : 0.4882
+
+  Hyperparameters
+    Learning rate          : 0.0003
+    Gamma / Lambda (GAE)   : 0.99 / 0.95
+    Clip epsilon           : 0.2
+    Entropy coef           : 0.05
+    Value coef             : 0.5
+    Epochs per update      : 10
+    Batch size             : 64
+    Update freq (steps)    : 2,048
+    Network hidden         : 64 units, 2 layers (Tanh)
+    Initialisation         : orthogonal
+    State normalisation    : pos → [-1,1], vel → [-1,1]
+    Reward shaping         : height + 100·KE - 1  (+10 at goal)
+=======================================================
+Saved: results/mountaincar_ppo_20260602_103539/summary.txt
+Saved: results/mountaincar_ppo_20260602_103539/training_results.png
+Saved: results/mountaincar_ppo_20260602_103539/trajectory.png
+
+Testing trained agent (20 episodes)...
+  ✗ Test  1: -200.0  (200 steps)
+  ✗ Test  2: -200.0  (200 steps)
+  ✗ Test  3: -118.0  (118 steps)
+  ✗ Test  4: -119.0  (119 steps)
+  ✗ Test  5: -200.0  (200 steps)
+  ✗ Test  6: -200.0  (200 steps)
+  ✗ Test  7: -200.0  (200 steps)
+  ✗ Test  8: -200.0  (200 steps)
+  ✗ Test  9: -200.0  (200 steps)
+  ✗ Test 10: -200.0  (200 steps)
+  ✗ Test 11: -132.0  (132 steps)
+  ✗ Test 12: -118.0  (118 steps)
+  ✗ Test 13: -118.0  (118 steps)
+  ✗ Test 14: -118.0  (118 steps)
+  ✗ Test 15: -123.0  (123 steps)
+  ✗ Test 16: -200.0  (200 steps)
+  ✗ Test 17: -118.0  (118 steps)
+  ✗ Test 18: -200.0  (200 steps)
+  ✗ Test 19: -200.0  (200 steps)
+  ✗ Test 20: -200.0  (200 steps)
+
+  Average : -168.20 ± 39.06
+  Success : 0/20  (0%)
+  Result  : Needs more training
+
+Results saved to: results/mountaincar_ppo_20260602_103539/
