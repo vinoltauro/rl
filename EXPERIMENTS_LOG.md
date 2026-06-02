@@ -23,12 +23,11 @@ Use this when writing the report.
 | CartPole | Actor-Critic | ✓ **Solved** | 1,175 | After fixing solved threshold |
 | CartPole | PPO | ✓ **Solved** | 195 | **Fastest** of all algorithms |
 | MountainCar | Q-Learning | ✗ Not solved | 50,000 | Best avg −130, last-100 avg −138 — confirmed tabular limit |
-| MountainCar | DQN | ⟳ **Running v4** | 5,000 | Running reward normalisation (Welford) — bounds Q-values |
-| MountainCar | Actor-Critic | ✗ **Structurally fails** | 5,000 | Known single-env A2C limitation — zero-advantage fixed point. SB3 requires n_envs=16. |
-| MountainCar | PPO | ⟳ **Running v5** | 8,000 | LR floor 5e-5, NO value clipping (bug #41) |
+| MountainCar | DQN | ⟳ **Running v5** | 8,000 | v3 config (raw rewards, hard target) + 8K eps |
+| MountainCar | Actor-Critic | ✗ **Structurally fails** | 5,000 | Known single-env A2C limitation. SB3 requires n_envs=16. |
+| MountainCar | PPO | ⟳ **Running v6** | 12,000 | v5 config + 12K eps — avg -151 at 8K, more budget |
 
-**v5 PPO started 2026-06-02 ~20:00 UTC** (mc_ppo_v5). Log: `mc_ppo_v5_run.log`.
-**v4 DQN still running** (mc_dqn_v4). Log: `mc_dqn_v4_run.log`.
+**v6 PPO + v5 DQN started 2026-06-02 ~21:15 UTC**. Logs: `mc_ppo_v6_run.log`, `mc_dqn_v5_run.log`.
 
 **v3 runs started 2026-06-02 ~17:00 UTC** in `rl_runs` tmux (mc_dqn_v3, mc_ac_v3, mc_ppo_v3). Logs: `mc_*_v3_run.log`.
 
@@ -94,6 +93,7 @@ Every completed run saves to `results/<name>_<timestamp>/`:
 | 39 | MC PPO v3: LR decay to 0 caused entropy collapse | `4_ppo.py` | Linear decay to 0 meant LR→0 by ep 8,000. With LR≈0, even entropy bonus gradient updates → 0. Policy went fully deterministic: final entropy=0.0032 (near zero vs 0.154 in v2). Only 26 goals in 8,000 eps. Performance held at -200 last 2,500 eps. | LR floor at 5e-5: `lr = 5e-5 + 2.5e-4*(1 - ep/N)`. Also tighten value clip 0.2→0.1. |
 | 40 | MC DQN v3: Q-value scale inflates loss without collapsing performance | `2_dqn.py` | Loss 696 at ep 5,000 but last-100 avg -146.68 ± 6.31 (best stable DQN result). Loss is high because shaped rewards push Q-values into [20-50] range — correct values, not overestimation. But without normalisation, Q-value scale grows indefinitely. Eventually will cause policy degradation. | Running reward normalisation (Welford's online algorithm): z-score each shaped reward before replay buffer entry, clip ±10σ. Q-values represent normalised returns. Equivalent to SB3 VecNormalize. |
 | 41 | MC PPO v3/v4: value clipping causes cyclic goal-forgetting | `4_ppo.py` | Value clip ε=0.1 limits V(s) to move 1.0/update cycle. With goal returns=50 and V(s)≈-8, advantages=58 → policy ratio always clipped at 1.2 → policy shifts only log(1.2)=0.18 per epoch toward goal. Entropy gradient (constant) beats intermittent goal gradient. Policy finds goals in burst (18 in ep 2017-2050) then forgets for 1,500 eps. Cyclic. Total 26 goals in 4,600 eps vs 3,363 in v2 with no clip. LR floor (5e-5) already limits value overfit — value clip is redundant and harmful. | Remove value clipping entirely. PPO v5 = LR floor + no value clip = v2 + stability fix. |
+| 42 | MC DQN v4: reward normalisation removed directional signal | `2_dqn.py` | Welford z-score normalisation of shaped rewards resulted in mean-zero unit-variance rewards at every step. The agent could no longer distinguish "near goal" (high height + KE) from "at valley bottom" (low). All states looked the same from the reward signal. Agent never found goal in 5,000 episodes (avg -200 throughout) while loss stayed flat at 1.4. High loss in v3 (~700) reflected correctly large Q-values, not overestimation. | Reverted to raw shaped rewards. Extended to 8K episodes. |
 
 ### Round 1 — Code Quality
 
@@ -206,8 +206,9 @@ Truncation fix: terminated vs truncated in GAE bootstrap
 | run 4 | 3,000 | -134 | -134 | Double DQN; MAX_STEPS=400 |
 | v2 (killed @ep250) | 250 | n/a | n/a | Killed; same bugs |
 | v2 restart | 5,000 | -143 | -200 | Found goals (avg -143 at ep 2,500) then Q-value explosion (loss 2,107) — bug #33/34/35 |
-| v3 | 5,000 | **-146.68** | **-146.68** | Hard target + LR 2e-5 + goal bonus +2. **Best stable DQN result.** Loss 696 but performance held — large Q-values correct not overestimated |
-| **v4** | 5,000 | ⟳ | ⟳ | **Running reward normalisation (Welford) — bounds Q-value scale** |
+| v3 | 5,000 | **-146.68** | **-146.68** | Hard target + LR 2e-5 + goal bonus +2. Best stable DQN. Loss 696 = correct large Q-values |
+| v4 | 5,000 | -200 | -200 | Reward normalisation removed directional signal — never found goal. Bug #42 |
+| **v5** | 8,000 | ⟳ | ⟳ | **v3 config (raw rewards) + 8K eps** |
 
 ### Actor-Critic
 | Run | Episodes | Best avg | End avg | Notes |
@@ -231,7 +232,8 @@ Truncation fix: terminated vs truncated in GAE bootstrap
 | v2 | 8,000 | -148 | -200 | 3,363 goals, avg -153 stable ep 3K–5K then catastrophic regression at ep 5,300 — bugs #31/32 |
 | v3 | 8,000 | ~-153 | -200 | LR decay to 0 → entropy collapse (0.0032). Only 26 goals. Bug #39 |
 | v4 (killed @4600) | 4,600 | ~-190 | n/a | LR floor fixed but value clip 0.1 → goal-forgetting cycles (bug #41). 26 goals |
-| **v5** | 8,000 | ⟳ | ⟳ | **LR floor 5e-5, NO value clip** — should restore v2 goal density |
+| v5 | 8,000 | -151.80 | -151.80 | LR floor + no value clip. 4,816 goals. No regression. Best PPO stability. |
+| **v6** | 12,000 | ⟳ | ⟳ | **v5 config + 12K eps — more budget to consolidate below -110** |
 
 ---
 
