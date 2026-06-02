@@ -149,9 +149,14 @@ def train():
         advantages_t = torch.tensor(advantages_list, dtype=torch.float32, device=DEVICE)
         advantages_t = (advantages_t - advantages_t.mean()) / (advantages_t.std() + 1e-8)
 
-        policy_loss = -(torch.stack(log_probs) * advantages_t).sum()
+        # squeeze(-1): log_probs and step_entropies are [T,1] from batch_size=1 Categorical.
+        # Without squeeze, [T,1] * [T] broadcasts to [T,T] outer product — policy gradient
+        # becomes sum(log_probs) * sum(advantages) ≈ 0 since normalized advantages sum to 0.
+        # .mean() instead of .sum() keeps loss scale independent of episode length.
+        log_probs_t = torch.stack(log_probs).squeeze(-1)          # [T]
+        entropy     = torch.stack(step_entropies).squeeze(-1).mean()  # scalar
+        policy_loss = -(log_probs_t * advantages_t).mean()
         value_loss  = F.smooth_l1_loss(values_t, returns_t)
-        entropy     = torch.stack(step_entropies).mean()   # exact entropy, not noisy -log_prob estimate
         loss        = policy_loss + value_loss - 0.01 * entropy
 
         optimizer.zero_grad()

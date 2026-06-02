@@ -14,10 +14,10 @@ Use this when writing the report.
 | CartPole | DQN | ✓ **Solved** | 225 | Fast once buffer size fixed |
 | CartPole | Actor-Critic | ✓ **Solved** | 1,175 | After fixing solved threshold |
 | CartPole | PPO | ✓ **Solved** | 195 | **Fastest** of all algorithms |
-| MountainCar | Q-Learning | ⟳ **Running v2** | 50,000 | Raw rewards (shaping caused regression — see bug #28) |
-| MountainCar | DQN | ⟳ **Running v2** | 5,000 | MAX_STEPS 400→200, N_EPISODES 3000→5000 |
-| MountainCar | Actor-Critic | ⟳ **Running v2** | 5,000 | GAE(λ=0.95) + exact entropy + truncation fix |
-| MountainCar | PPO | ⟳ **Running v2** | 8,000 | N_EPISODES 3000→8000 + truncation fix |
+| MountainCar | Q-Learning | ✅ **Not solved** | 50,000 | Best avg -130 — confirmed tabular limit |
+| MountainCar | DQN | ⟳ **Running v2** | 5,000 | EPS_END 0.01→0.05 fix (bug #30), restarted 14:55 |
+| MountainCar | Actor-Critic | ⟳ **Running v2** | 5,000 | Policy gradient outer product bug fixed (bug #29), restarted 14:55 |
+| MountainCar | PPO | ⟳ **Running v2** | 8,000 | ep 3,700+, finding goals regularly, avg ~-153 |
 
 All 4 MountainCar v2 runs started **2026-06-02 14:15** in `rl_runs` tmux session (windows: mc_ql_v2, mc_dqn_v2, mc_ac_v2, mc_ppo_v2). Logs: `mc_*_v2_run.log`.
 
@@ -65,6 +65,8 @@ Every completed run saves to `results/<name>_<timestamp>/`:
 | 26 | MC AC + PPO: truncation bias in GAE/returns | `3_actor_critic.py`, `4_ppo.py` | `done = terminated or truncated`. Bootstrap zeroed for BOTH true terminals AND timeouts. Timeout episodes should bootstrap V(s_final) ≠ 0, since the episode continues from that state in principle. With >50% timeout episodes, this systematically underestimates V(s), biasing advantages | AC: explicit bootstrap from V(final_state) when truncated. PPO: store `terminated` separately, use it (not `done`) in GAE bootstrap mask |
 | 27 | MC PPO: N_EPISODES=3000 insufficient | `4_ppo.py` | PPO was finding goal (avg -162) but couldn't consolidate to -110 within budget. ~480K steps needed ~1M+ for MountainCar-v0 | N_EPISODES 3000 → 8000 (~1.3M steps) |
 | 28 | MC Q-Learning: reward shaping caused regression | `1_q_learning.py` | v2 run with shaped reward stayed at avg -200 through all 44,000 episodes (vs -130 with raw rewards in v1). Shaped reward `height + 100·KE - 1` creates a locally optimal greedy policy that oscillates in a high-momentum region without crossing pos=0.5. With ε=0.001 since ep 11K, Q-table has no exploration to escape this attractor. Deep RL escapes via function approximation noise; tabular with a converged greedy policy cannot. This is an empirical demonstration of Ng et al. (1999): non-potential-based shaping can alter the optimal policy. | Reverted to raw rewards. Kept shape_reward() in code with full explanation. Tabular Q-Learning uses raw rewards — this is the correct valid comparison. |
+| 29 | MC AC: policy gradient outer product bug | `3_actor_critic.py` | `dist.log_prob(action)` returns shape [1] for batch_size=1. `torch.stack(log_probs)` → [T,1]. Multiplying [T,1] × [T] advantages via PyTorch broadcasting produces [T,T] outer product instead of element-wise [T]. `.sum()` on [T,T] = sum(log_probs) × sum(advantages). Since normalized advantages sum to exactly 0, policy_loss ≡ 0 — policy gradient was **zero for every update**. AC was running 2,700 episodes on zero policy gradient, only updating the critic. Previous run 4 (-188 avg) also had this bug — that result came from random exploration, not learned policy. | `torch.stack(log_probs).squeeze(-1)` to get [T]; same for entropies. Changed `.sum()` → `.mean()` for episode-length independence. |
+| 30 | MC DQN: EPS_END=0.01 too low, greedy policy stuck | `2_dqn.py` | With EPS_DECAY=50000 and MAX_STEPS=200, epsilon hits ~0.013 by ep 1,400. DQN policy becomes 98.7% deterministic. If greedy policy doesn't reach goal (shaped reward attractor), agent is stuck with only 1.3% random exploration chance. PPO avoids this by always sampling from a distribution. | EPS_END 0.01 → 0.05 — maintain 5% floor exploration permanently. |
 
 ### Round 1 — Code Quality
 
@@ -157,7 +159,7 @@ Truncation fix: terminated vs truncated in GAE bootstrap  ← new in v2
 | run 1 | 25,000 | -138.11 | -123.72 | Raw reward |
 | run 2 | 50,000 | -137.82 | -130.05 | Raw reward |
 | v2 (killed) | 44,000 | -200.00 | -200.00 | Shaped reward — stuck in local attractor (bug #28) |
-| **v2 restart** | 50,000 | ⟳ | ⟳ | **Raw reward — correct approach** |
+| **v2 restart** | 50,000 | ✅ **-137.82** | **-130.05** | Raw reward — matches v1, confirms tabular limit |
 
 ### DQN
 | Run | Episodes | Last-100 avg | Notes |
@@ -176,7 +178,8 @@ Truncation fix: terminated vs truncated in GAE bootstrap  ← new in v2
 | run 2 | 2,000 | -200.00 | Advantages normalised; entropy=0.05 still too high |
 | run 3 | 3,000 | -200.00 | entropy=0.05 — actor loss 5,442 |
 | run 4 | 3,000 | -188.91 | entropy=0.01 — improved but MC variance too high |
-| **v2** | 5,000 | ⟳ | **GAE(λ=0.95) + exact entropy + truncation fix** |
+| v2 (killed@2700) | 2,700 | -200.00 | Policy gradient ≡ 0 — outer product bug (bug #29) |
+| **v2 restart** | 5,000 | ⟳ | **Policy gradient fix + GAE(λ=0.95) + exact entropy** |
 
 ### PPO
 | Run | Episodes | Last-100 avg | Notes |
