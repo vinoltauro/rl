@@ -151,10 +151,11 @@ class PPOAgent:
                                    torch.clamp(ratio, 1 - CLIP_EPS, 1 + CLIP_EPS) * b_adv).mean()
 
                 # Value function clipping (Schulman 2017 appendix, Engstrom 2020).
-                # Prevents value function from making large jumps between updates,
-                # which caused misleading advantage estimates and late-stage regression.
+                # Tighter clip (0.1) for value vs policy (0.2) — value function
+                # needs more conservative updates to prevent overfit.
+                VALUE_CLIP_EPS = 0.1
                 v_pred         = values.squeeze()
-                v_pred_clipped = b_old_val + torch.clamp(v_pred - b_old_val, -CLIP_EPS, CLIP_EPS)
+                v_pred_clipped = b_old_val + torch.clamp(v_pred - b_old_val, -VALUE_CLIP_EPS, VALUE_CLIP_EPS)
                 vl             = torch.max(0.5 * (v_pred - b_ret) ** 2,
                                            0.5 * (v_pred_clipped - b_ret) ** 2).mean()
                 loss  = pl + VALUE_COEF * vl - ENTROPY_COEF * entropy
@@ -198,9 +199,11 @@ def train():
     print("=" * 55)
 
     for episode in range(N_EPISODES):
-        # Linear LR decay: 3e-4 → 0 over training (Engstrom 2020).
-        # Prevents full-LR updates from destroying a near-optimal policy late in training.
-        current_lr = LR * max(0.0, 1.0 - episode / N_EPISODES)
+        # Linear LR decay: 3e-4 → 5e-5 floor over training (Engstrom 2020).
+        # Decays to floor (not zero) — zero LR in v3 starved early goal-finding
+        # (only 26 goals vs 3,363 in v2). Floor of 5e-5 keeps updates meaningful.
+        LR_MIN = 5e-5
+        current_lr = LR_MIN + (LR - LR_MIN) * max(0.0, 1.0 - episode / N_EPISODES)
         agent.optimizer.param_groups[0]['lr'] = current_lr
 
         state, _      = env.reset()
