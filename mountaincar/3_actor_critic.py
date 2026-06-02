@@ -23,7 +23,10 @@ plt.rcParams.update(PLT_STYLE)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Hyperparameters
-LR         = 3e-4
+ACTOR_LR   = 3e-4    # actor learns faster — keeps advantages non-zero while critic catches up
+CRITIC_LR  = 1e-4    # critic learns slower — prevents converging to bad policy's V(s) too quickly
+VALUE_COEF = 0.5     # standard from Schulman 2017 — reduces critic dominance in combined loss
+ENTROPY_COEF = 0.02  # slightly higher than 0.01 — maintains stochasticity to escape zero-advantage trap
 GAMMA      = 0.99
 LAM        = 0.95    # GAE lambda — trades variance for bias; 0.95 is standard
 N_EPISODES = 5000
@@ -74,7 +77,12 @@ def train():
     env       = gym.make('MountainCar-v0')
     env.reset(seed=SEED)
     model     = ActorCritic(2, env.action_space.n).to(DEVICE)
-    optimizer = optim.Adam(model.parameters(), lr=LR, eps=1e-5)
+    # Separate param groups: actor learns 3x faster than critic.
+    # Prevents critic from converging to bad policy's V(s) before actor finds the goal.
+    optimizer = optim.Adam([
+        {'params': model.actor.parameters(),  'lr': ACTOR_LR},
+        {'params': model.critic.parameters(), 'lr': CRITIC_LR},
+    ], eps=1e-5)
 
     episode_raw_rewards = []
     episode_lengths     = []
@@ -157,7 +165,7 @@ def train():
         entropy     = torch.stack(step_entropies).squeeze(-1).mean()  # scalar
         policy_loss = -(log_probs_t * advantages_t).mean()
         value_loss  = F.smooth_l1_loss(values_t, returns_t)
-        loss        = policy_loss + value_loss - 0.01 * entropy
+        loss        = policy_loss + VALUE_COEF * value_loss - ENTROPY_COEF * entropy
 
         optimizer.zero_grad()
         loss.backward()
@@ -216,7 +224,9 @@ def save_summary(episode_raw_rewards, episode_lengths, actor_losses, critic_loss
         f"  Final mean critic loss   : {np.mean(critic_losses[-50:]):.4f}",
         "",
         "  Hyperparameters",
-        f"    Learning rate          : {LR}",
+        f"    Actor LR / Critic LR   : {ACTOR_LR} / {CRITIC_LR}",
+        f"    Value coef             : {VALUE_COEF}",
+        f"    Entropy coef           : {ENTROPY_COEF}",
         f"    Gamma                  : {GAMMA}",
         f"    GAE lambda             : {LAM}",
         f"    Gradient clip norm     : 0.5",

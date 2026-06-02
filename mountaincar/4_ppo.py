@@ -125,6 +125,7 @@ class PPOAgent:
         advantages = torch.FloatTensor(advantages).to(DEVICE)
         returns    = advantages + torch.FloatTensor(self.values).to(DEVICE)
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        old_vals   = torch.FloatTensor(self.values).to(DEVICE)  # for value clipping
 
         indices = np.arange(len(states))
         total_pl, total_vl, total_ent, n = 0, 0, 0, 0
@@ -138,6 +139,7 @@ class PPOAgent:
                 b_old_lp  = old_lp[idx]
                 b_adv     = advantages[idx]
                 b_ret     = returns[idx]
+                b_old_val = old_vals[idx]
 
                 probs, values = self.policy(b_states)
                 dist          = Categorical(probs)
@@ -147,7 +149,14 @@ class PPOAgent:
                 ratio = torch.exp(new_lp - b_old_lp)
                 pl    = -torch.min(ratio * b_adv,
                                    torch.clamp(ratio, 1 - CLIP_EPS, 1 + CLIP_EPS) * b_adv).mean()
-                vl    = 0.5 * ((values.squeeze() - b_ret) ** 2).mean()
+
+                # Value function clipping (Schulman 2017 appendix, Engstrom 2020).
+                # Prevents value function from making large jumps between updates,
+                # which caused misleading advantage estimates and late-stage regression.
+                v_pred         = values.squeeze()
+                v_pred_clipped = b_old_val + torch.clamp(v_pred - b_old_val, -CLIP_EPS, CLIP_EPS)
+                vl             = torch.max(0.5 * (v_pred - b_ret) ** 2,
+                                           0.5 * (v_pred_clipped - b_ret) ** 2).mean()
                 loss  = pl + VALUE_COEF * vl - ENTROPY_COEF * entropy
 
                 self.optimizer.zero_grad()
@@ -189,6 +198,11 @@ def train():
     print("=" * 55)
 
     for episode in range(N_EPISODES):
+        # Linear LR decay: 3e-4 → 0 over training (Engstrom 2020).
+        # Prevents full-LR updates from destroying a near-optimal policy late in training.
+        current_lr = LR * max(0.0, 1.0 - episode / N_EPISODES)
+        agent.optimizer.param_groups[0]['lr'] = current_lr
+
         state, _      = env.reset()
         ep_raw_reward = 0
         steps         = 0
@@ -294,6 +308,8 @@ def save_summary(episode_raw_rewards, episode_lengths, policy_losses, value_loss
         f"    State normalisation    : pos → [-1,1], vel → [-1,1]",
         f"    Reward shaping         : height + 100·KE - 1  (+10 at goal)",
         f"    Truncation fix         : terminated vs truncated in GAE bootstrap",
+        f"    LR schedule            : linear decay {LR} → 0 over {N_EPISODES} episodes",
+        f"    Value clipping         : v_pred clipped within CLIP_EPS of v_old",
         "=" * 55,
     ]
     text = '\n'.join(lines)

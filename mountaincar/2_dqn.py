@@ -31,8 +31,8 @@ GAMMA       = 0.99
 EPS_START   = 1.0
 EPS_END     = 0.05    # floor at 5%: prevents fully deterministic policy getting stuck in local attractor
 EPS_DECAY   = 50000   # steps — with 200 steps/ep, stays meaningful for ~400+ episodes
-TAU         = 0.005   # soft target update
-LR          = 5e-5    # lowered from 1e-4; Double DQN still benefits from smaller LR
+TARGET_UPDATE = 500    # hard target update every N steps — more stable than soft update
+LR          = 2e-5    # lowered from 5e-5; smaller updates prevent Q-value runaway
 MEMORY_SIZE = 50000
 N_EPISODES  = 5000
 MAX_STEPS   = 200     # standardised to match AC/PPO and gym default
@@ -58,7 +58,8 @@ def shape_reward(pos, vel, terminated):
     ke     = vel * vel                   # kinetic energy proxy
     reward = height + 100.0 * ke - 1.0  # step penalty encourages efficiency
     if terminated and pos >= 0.5:
-        reward += 10.0   # align with AC/PPO; +100 inflated Q-targets and caused divergence
+        reward += 2.0    # reduced from +10: smaller bonus prevents large TD error spikes
+                         # that caused Q-value runaway (loss 2107) in previous runs
     return reward
 
 
@@ -103,9 +104,10 @@ def optimize(policy_net, target_net, optimizer, memory):
     return loss.item()
 
 
-def soft_update(policy_net, target_net):
-    for tp, pp in zip(target_net.parameters(), policy_net.parameters()):
-        tp.data.copy_(TAU * pp.data + (1 - TAU) * tp.data)
+def hard_update(policy_net, target_net):
+    """Hard copy every TARGET_UPDATE steps — more stable than soft update when
+    Q-values are changing rapidly (soft update caused runaway in previous runs)."""
+    target_net.load_state_dict(policy_net.state_dict())
 
 
 def train():
@@ -158,7 +160,8 @@ def train():
             if loss is not None:
                 episode_losses.append(loss)
 
-            soft_update(policy_net, target_net)
+            if steps_done % TARGET_UPDATE == 0:
+                hard_update(policy_net, target_net)
             if done:
                 break
 
@@ -215,7 +218,7 @@ def save_summary(episode_rewards, episode_lengths, loss_history, solve_ep, save_
         f"    Gamma                  : {GAMMA}",
         f"    Learning rate          : {LR}",
         f"    Epsilon                : {EPS_START} → {EPS_END}  (decay steps: {EPS_DECAY})",
-        f"    Soft update tau        : {TAU}",
+        f"    Target update          : hard copy every {TARGET_UPDATE} steps",
         f"    Replay buffer          : {MEMORY_SIZE:,}",
         f"    Max steps/episode      : {MAX_STEPS}",
         f"    Reward shaping         : height + 100·KE - 1  (+10 at goal)",
