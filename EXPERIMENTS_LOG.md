@@ -25,9 +25,10 @@ Use this when writing the report.
 | MountainCar | Q-Learning | ✗ Not solved | 50,000 | Best avg −130, last-100 avg −138 — confirmed tabular limit |
 | MountainCar | DQN | ⟳ **Running v4** | 5,000 | Running reward normalisation (Welford) — bounds Q-values |
 | MountainCar | Actor-Critic | ✗ **Structurally fails** | 5,000 | Known single-env A2C limitation — zero-advantage fixed point. SB3 requires n_envs=16. |
-| MountainCar | PPO | ⟳ **Running v4** | 8,000 | LR floor 5e-5 (not 0) + value clip 0.1 |
+| MountainCar | PPO | ⟳ **Running v5** | 8,000 | LR floor 5e-5, NO value clipping (bug #41) |
 
-**v4 runs started 2026-06-02 ~18:50 UTC** (mc_ppo_v4, mc_dqn_v4). Logs: `mc_*_v4_run.log`.
+**v5 PPO started 2026-06-02 ~20:00 UTC** (mc_ppo_v5). Log: `mc_ppo_v5_run.log`.
+**v4 DQN still running** (mc_dqn_v4). Log: `mc_dqn_v4_run.log`.
 
 **v3 runs started 2026-06-02 ~17:00 UTC** in `rl_runs` tmux (mc_dqn_v3, mc_ac_v3, mc_ppo_v3). Logs: `mc_*_v3_run.log`.
 
@@ -92,6 +93,7 @@ Every completed run saves to `results/<name>_<timestamp>/`:
 | 38 | MC AC: ENTROPY_COEF=0.01 too low to escape fixed point | `3_actor_critic.py` | Once critic tracks bad policy, entropy term alone must maintain stochasticity. 0.01 insufficient to prevent the policy converging deterministically before finding goal | ENTROPY_COEF 0.01 → 0.02 |
 | 39 | MC PPO v3: LR decay to 0 caused entropy collapse | `4_ppo.py` | Linear decay to 0 meant LR→0 by ep 8,000. With LR≈0, even entropy bonus gradient updates → 0. Policy went fully deterministic: final entropy=0.0032 (near zero vs 0.154 in v2). Only 26 goals in 8,000 eps. Performance held at -200 last 2,500 eps. | LR floor at 5e-5: `lr = 5e-5 + 2.5e-4*(1 - ep/N)`. Also tighten value clip 0.2→0.1. |
 | 40 | MC DQN v3: Q-value scale inflates loss without collapsing performance | `2_dqn.py` | Loss 696 at ep 5,000 but last-100 avg -146.68 ± 6.31 (best stable DQN result). Loss is high because shaped rewards push Q-values into [20-50] range — correct values, not overestimation. But without normalisation, Q-value scale grows indefinitely. Eventually will cause policy degradation. | Running reward normalisation (Welford's online algorithm): z-score each shaped reward before replay buffer entry, clip ±10σ. Q-values represent normalised returns. Equivalent to SB3 VecNormalize. |
+| 41 | MC PPO v3/v4: value clipping causes cyclic goal-forgetting | `4_ppo.py` | Value clip ε=0.1 limits V(s) to move 1.0/update cycle. With goal returns=50 and V(s)≈-8, advantages=58 → policy ratio always clipped at 1.2 → policy shifts only log(1.2)=0.18 per epoch toward goal. Entropy gradient (constant) beats intermittent goal gradient. Policy finds goals in burst (18 in ep 2017-2050) then forgets for 1,500 eps. Cyclic. Total 26 goals in 4,600 eps vs 3,363 in v2 with no clip. LR floor (5e-5) already limits value overfit — value clip is redundant and harmful. | Remove value clipping entirely. PPO v5 = LR floor + no value clip = v2 + stability fix. |
 
 ### Round 1 — Code Quality
 
@@ -170,12 +172,12 @@ Truncation fix: V(final_state) bootstrap on timeout
 GAE(λ=0.95) replaces full MC returns
 ```
 
-### MountainCar PPO (v4)
+### MountainCar PPO (v5 — current)
 ```
 Network: 2 → 64 → 64 → 3  (Tanh, orthogonal init)
-LR: 5e-5 + 2.5e-4*(1 - ep/N) → floor 5e-5  ← v3 decayed to 0 → entropy collapse
+LR: 5e-5 + 2.5e-4*(1 - ep/N) → floor 5e-5  ← prevents entropy collapse AND value overfit
 γ=0.99, λ=0.95, clip=0.2, entropy=0.01, VALUE_COEF=0.5
-Value clip: 0.1 (tighter than policy clip 0.2)  ← was same as policy clip
+Value clipping: NONE  ← removed (caused cyclic goal-forgetting, bug #41)
 Update every 1,024 steps, 10 epochs, batch 64
 N_EPISODES=8,000, MAX_STEPS=200
 State normalisation: pos → [−1,1], vel → [−1,1]
@@ -227,8 +229,9 @@ Truncation fix: terminated vs truncated in GAE bootstrap
 | run 4 | 3,000 | -162 | -162 | entropy=0.01 ✓ |
 | run 5 | 3,000 | -142 | -142 | entropy=0.01 |
 | v2 | 8,000 | -148 | -200 | 3,363 goals, avg -153 stable ep 3K–5K then catastrophic regression at ep 5,300 — bugs #31/32 |
-| v3 | 8,000 | ~-153 | -200 | LR decay to 0 → entropy collapse (0.0032). Only 26 goals. Policy deterministic by ep 5,000 — bug #39 |
-| **v4** | 8,000 | ⟳ | ⟳ | **LR floor 5e-5 + value clip 0.1** — first goal ep 43 |
+| v3 | 8,000 | ~-153 | -200 | LR decay to 0 → entropy collapse (0.0032). Only 26 goals. Bug #39 |
+| v4 (killed @4600) | 4,600 | ~-190 | n/a | LR floor fixed but value clip 0.1 → goal-forgetting cycles (bug #41). 26 goals |
+| **v5** | 8,000 | ⟳ | ⟳ | **LR floor 5e-5, NO value clip** — should restore v2 goal density |
 
 ---
 
