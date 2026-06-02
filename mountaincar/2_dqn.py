@@ -22,7 +22,7 @@ BATCH_SIZE   = 64
 GAMMA        = 0.99
 EPS_START    = 1.0
 EPS_END      = 0.01
-EPS_DECAY    = 1000   # steps
+EPS_DECAY    = 10000  # steps — slow enough to explore MountainCar adequately
 TAU          = 0.005  # soft target update
 LR           = 1e-3
 MEMORY_SIZE  = 20000
@@ -44,13 +44,14 @@ class DQN(nn.Module):
         return self.net(x)
 
 
-def shape_reward(pos, vel, raw_reward, terminated):
-    """Physics-based reward shaping: height + kinetic energy bonus."""
-    height_bonus = abs(pos + 0.5) * 10.0
-    shaped = height_bonus
-    if pos >= 0.5:
-        shaped += 100.0
-    return shaped
+def shape_reward(pos, vel, terminated):
+    """Physics-based reward shaping: height + kinetic energy + step penalty."""
+    height = (pos + 1.2) / 1.8 * 2.0   # maps [-1.2, 0.6] → [0, 2]
+    ke     = vel * vel                   # kinetic energy proxy
+    reward = height + 100.0 * ke - 1.0  # step penalty encourages efficiency
+    if terminated and pos >= 0.5:
+        reward += 100.0
+    return reward
 
 
 def select_action(policy_net, state, steps_done, n_actions):
@@ -128,7 +129,7 @@ def train():
 
             next_obs, raw_reward, terminated, truncated, _ = env.step(action.item())
             done    = terminated or truncated
-            shaped  = shape_reward(next_obs[0], next_obs[1], raw_reward, terminated)
+            shaped  = shape_reward(next_obs[0], next_obs[1], terminated)
             total_reward += raw_reward  # track real reward for evaluation
 
             shaped_t   = torch.tensor([shaped], dtype=torch.float32, device=DEVICE)
@@ -187,7 +188,7 @@ def plot_results(episode_rewards, loss_history, epsilon_history, save_dir):
     axes[1, 0].set_title('Training Loss')
     axes[1, 0].set_xlabel('Episode')
     axes[1, 0].set_ylabel('Loss')
-    axes[1, 0].set_yscale('log')
+    axes[1, 0].set_yscale('symlog', linthresh=1e-4)
     axes[1, 0].grid(True, alpha=0.3)
 
     axes[1, 1].plot(epsilon_history, color='orange', linewidth=2)

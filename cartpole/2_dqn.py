@@ -174,7 +174,7 @@ def plot_results(episode_rewards, loss_history, epsilon_history, save_dir):
     axes[1, 0].set_title('Training Loss (Huber)')
     axes[1, 0].set_xlabel('Episode')
     axes[1, 0].set_ylabel('Loss')
-    axes[1, 0].set_yscale('log')
+    axes[1, 0].set_yscale('symlog', linthresh=1e-4)
     axes[1, 0].grid(True, alpha=0.3)
 
     axes[1, 1].plot(epsilon_history, color='orange', linewidth=2)

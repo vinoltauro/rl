@@ -117,7 +117,7 @@ def plot_results(q_table, episode_rewards, episode_lengths, save_dir):
     value_map = np.max(q_table, axis=2).copy()
     for r, c in WALLS:
         value_map[r, c] = np.nan
-    cmap = plt.cm.RdYlGn
+    cmap = plt.cm.RdYlGn.copy()
     cmap.set_bad(color='black')
     im = axes[1, 0].imshow(value_map, cmap=cmap, interpolation='nearest')
     plt.colorbar(im, ax=axes[1, 0])
@@ -153,7 +153,7 @@ def plot_results(q_table, episode_rewards, episode_lengths, save_dir):
 
 def test_agent(q_table, n_episodes=10):
     print(f"\nTesting trained agent ({n_episodes} episodes, epsilon=0)...")
-    rewards, lengths = [], []
+    rewards, lengths, goals = [], [], []
 
     for episode in range(n_episodes):
         state = START
@@ -168,12 +168,14 @@ def test_agent(q_table, n_episodes=10):
 
         rewards.append(total_reward)
         lengths.append(step + 1)
-        status = "✓" if state == GOAL else "✗"
+        reached = (state == GOAL)
+        goals.append(reached)
+        status = "✓" if reached else "✗"
         print(f"  {status} Test {episode+1:2d}: {total_reward:6.2f} reward  |  {step+1:3d} steps")
 
     print(f"\n  Avg reward : {np.mean(rewards):.2f}")
     print(f"  Avg steps  : {np.mean(lengths):.1f}")
-    print(f"  Reached goal: {sum(1 for r in rewards if r > 0)}/{n_episodes}")
+    print(f"  Reached goal: {sum(goals)}/{n_episodes}")
 
 
 if __name__ == "__main__":

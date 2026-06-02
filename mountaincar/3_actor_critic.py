@@ -117,7 +117,7 @@ def train():
 
         returns_t = torch.tensor(returns, dtype=torch.float32, device=DEVICE)
         returns_t = (returns_t - returns_t.mean()) / (returns_t.std() + 1e-9)
-        values_t  = torch.cat(values).squeeze()
+        values_t  = torch.cat(values).squeeze(-1)
 
         advantages  = returns_t - values_t.detach()
         policy_loss = -(torch.stack(log_probs) * advantages).sum()

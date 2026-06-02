@@ -175,7 +175,6 @@ def train():
     policy_losses       = []
     value_losses        = []
     entropies           = []
-    total_steps         = 0
 
     print(f"MountainCar PPO | Device: {DEVICE}")
     print("=" * 50)
@@ -197,8 +196,6 @@ def train():
             ep_reward     += s_rew
             ep_raw_reward += raw_reward
             steps         += 1
-            total_steps   += 1
-
             if len(agent.states) >= UPDATE_FREQ:
                 pl, vl, ent = agent.update()
                 policy_losses.append(pl)

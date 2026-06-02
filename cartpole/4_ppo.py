@@ -221,7 +221,6 @@ def plot_results(episode_rewards, episode_lengths, policy_losses, value_losses,
     if len(episode_rewards) >= window:
         ma = np.convolve(episode_rewards, np.ones(window) / window, mode='valid')
         axes[0, 1].plot(range(window - 1, len(episode_rewards)), ma, color='green', linewidth=2)
-        axes[0, 1].fill_between(range(window - 1, len(episode_rewards)), ma - 10, ma + 10, alpha=0.2, color='green')
         axes[0, 1].axhline(y=SOLVED_AVG, color='red', linestyle='--', label=f'Solved ({SOLVED_AVG})')
     axes[0, 1].set_title(f'Moving Average ({window} episodes)')
     axes[0, 1].set_xlabel('Episode')

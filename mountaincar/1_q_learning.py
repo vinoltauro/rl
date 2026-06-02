@@ -62,8 +62,7 @@ def train():
             done = terminated or truncated
 
             current_q  = q_table[state + (action,)]
-            # If terminated with reward > -200 the car reached the goal — no future value
-            max_next_q = 0.0 if (done and reward > -200) else np.max(q_table[next_state])
+            max_next_q = 0.0 if done else np.max(q_table[next_state])
             q_table[state + (action,)] += LR * (reward + GAMMA * max_next_q - current_q)
 
             state = next_state

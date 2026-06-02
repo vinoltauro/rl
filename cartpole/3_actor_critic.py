@@ -18,6 +18,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 LR         = 3e-4   # lowered from 3e-2 for stability
 GAMMA      = 0.99
 N_EPISODES = 1000
+MAX_STEPS  = 500
 SOLVED_AVG = 495    # CartPole "mastered" threshold (max episode length)
 
 
@@ -52,7 +53,7 @@ def train():
 
         log_probs, values, rewards = [], [], []
 
-        for _ in range(500):
+        for _ in range(MAX_STEPS):
             probs, value = model(state)
             dist   = torch.distributions.Categorical(probs)
             action = dist.sample()
@@ -76,7 +77,7 @@ def train():
 
         returns_t = torch.tensor(returns, dtype=torch.float32, device=DEVICE)
         returns_t = (returns_t - returns_t.mean()) / (returns_t.std() + 1e-9)
-        values_t  = torch.cat(values).squeeze()
+        values_t  = torch.cat(values).squeeze(-1)
 
         advantages  = returns_t - values_t.detach()
         policy_loss = -(torch.stack(log_probs) * advantages).sum()
@@ -154,7 +155,7 @@ def test_agent(model, n_episodes=10):
         state, _ = env.reset()
         total_reward = 0
 
-        for _ in range(500):
+        for _ in range(MAX_STEPS):
             state_t = torch.from_numpy(state).float().to(DEVICE)
             with torch.no_grad():
                 probs, _ = model(state_t)
