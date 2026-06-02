@@ -32,9 +32,9 @@ EPS_START   = 1.0
 EPS_END     = 0.01
 EPS_DECAY   = 50000   # steps — with 400 steps/ep, epsilon stays meaningful for ~200+ episodes
 TAU         = 0.005   # soft target update
-LR          = 1e-4    # 1e-3 caused Q-value explosion (loss ~115K); DQN needs 1e-4
+LR          = 5e-5    # lowered from 1e-4; Double DQN still benefits from smaller LR
 MEMORY_SIZE = 50000
-N_EPISODES  = 2000
+N_EPISODES  = 3000
 MAX_STEPS   = 400
 SOLVED_AVG  = -110.0
 
@@ -87,7 +87,11 @@ def optimize(policy_net, target_net, optimizer, memory):
     non_final_next = torch.cat([s for s in next_states if s is not None])
     next_values    = torch.zeros(BATCH_SIZE, device=DEVICE)
     with torch.no_grad():
-        next_values[non_final_mask] = target_net(non_final_next).max(1)[0]
+        # Double DQN: policy_net selects action, target_net evaluates it.
+        # Decouples selection from evaluation → removes overestimation bias
+        # that caused Q-values to diverge (loss ~2500) in standard DQN.
+        next_actions = policy_net(non_final_next).max(1)[1].unsqueeze(1)
+        next_values[non_final_mask] = target_net(non_final_next).gather(1, next_actions).squeeze(1)
 
     expected = (next_values * GAMMA) + reward_batch
     loss     = F.smooth_l1_loss(state_action_values, expected.unsqueeze(1))
