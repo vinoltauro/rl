@@ -5,6 +5,14 @@ Use this when writing the report.
 
 ---
 
+## TODO / Future Work
+
+| # | Task | Priority | Notes |
+|---|---|---|---|
+| 1 | **Batch A2C (simulated parallelism)** | High | Collect N=8 episodes before each gradient update to simulate n_envs=8. Directly addresses the zero-advantage fixed point that causes single-env A2C to fail. Confirmed root cause: SB3 requires n_envs=16 for MountainCar. See bug #36 and Option B analysis. |
+
+---
+
 ## Final Results
 
 | Environment | Algorithm | Result | Episodes | Notes |
@@ -16,7 +24,7 @@ Use this when writing the report.
 | CartPole | PPO | ✓ **Solved** | 195 | **Fastest** of all algorithms |
 | MountainCar | Q-Learning | ✗ Not solved | 50,000 | Best avg −130, last-100 avg −138 — confirmed tabular limit |
 | MountainCar | DQN | ⟳ **Running v3** | 5,000 | Hard target update + LR 2e-5 + goal bonus +2 |
-| MountainCar | Actor-Critic | ⟳ **Running v3** | 5,000 | Separate LRs (actor 3e-4 / critic 1e-4) + VALUE_COEF=0.5 |
+| MountainCar | Actor-Critic | ✗ **Structurally fails** | 5,000 | Known single-env A2C limitation — zero-advantage fixed point. SB3 requires n_envs=16. |
 | MountainCar | PPO | ⟳ **Running v3** | 8,000 | Linear LR decay + value function clipping |
 
 **v3 runs started 2026-06-02 ~17:00 UTC** in `rl_runs` tmux (mc_dqn_v3, mc_ac_v3, mc_ppo_v3). Logs: `mc_*_v3_run.log`.
@@ -254,3 +262,5 @@ With reward shaping (`height + 100·KE − 1`), all deep RL algorithms can learn
 10. **Zero-advantage fixed point in single-env A2C.** When critic converges to V(s) for a bad policy, advantages → 0, policy gradient → 0. Actor loss = 0.000023 by ep 600 for all 5,000 episodes. Requires either parallel environments (A3C) or asymmetric LRs to escape.
 
 11. **Q-value runaway requires stable targets** (Mnih 2015). Soft target update (TAU=0.005) causes target to chase inflating online Q-values — no stable reference. Hard update every 500 steps fixes target at a historical snapshot, breaking the feedback loop. Goal bonus must also be small (+2 not +10) to avoid initial TD shock.
+
+12. **Single-environment A2C cannot solve MountainCar — this is structural, not a bug.** Confirmed across all runs (v1–v3, 20,000+ total episodes, zero goals). Root cause is a zero-advantage fixed point: critic converges to V(s) for the current bad policy by ep ~600, advantages → 0, policy gradient → 0. This is mathematically inevitable regardless of LR, VALUE_COEF, or entropy settings. The only escape is environmental diversity. RL Baselines3 Zoo requires `n_envs: 16` specifically for this environment (confirmed via web search). The A3C paper (Mnih 2016) motivated parallelism as the structural solution — not an optimisation. Contrast with PPO: multi-epoch updates over 1,024-step buffers spanning episode boundaries provide implicit diversity from a single environment. This is one of the deepest algorithmic insights in the dissertation: the structural difference between A2C's need for parallelism vs PPO's epoch-reuse mechanism. Cite: Mnih 2016, Dann et al. 2022, RL Baselines3 Zoo a2c.yml.
