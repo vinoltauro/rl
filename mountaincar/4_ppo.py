@@ -125,8 +125,6 @@ class PPOAgent:
         advantages = torch.FloatTensor(advantages).to(DEVICE)
         returns    = advantages + torch.FloatTensor(self.values).to(DEVICE)
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-        old_vals   = torch.FloatTensor(self.values).to(DEVICE)  # for value clipping
-
         indices = np.arange(len(states))
         total_pl, total_vl, total_ent, n = 0, 0, 0, 0
 
@@ -139,8 +137,6 @@ class PPOAgent:
                 b_old_lp  = old_lp[idx]
                 b_adv     = advantages[idx]
                 b_ret     = returns[idx]
-                b_old_val = old_vals[idx]
-
                 probs, values = self.policy(b_states)
                 dist          = Categorical(probs)
                 new_lp        = dist.log_prob(b_actions)
@@ -150,14 +146,15 @@ class PPOAgent:
                 pl    = -torch.min(ratio * b_adv,
                                    torch.clamp(ratio, 1 - CLIP_EPS, 1 + CLIP_EPS) * b_adv).mean()
 
-                # Value function clipping (Schulman 2017 appendix, Engstrom 2020).
-                # Tighter clip (0.1) for value vs policy (0.2) — value function
-                # needs more conservative updates to prevent overfit.
-                VALUE_CLIP_EPS = 0.1
-                v_pred         = values.squeeze()
-                v_pred_clipped = b_old_val + torch.clamp(v_pred - b_old_val, -VALUE_CLIP_EPS, VALUE_CLIP_EPS)
-                vl             = torch.max(0.5 * (v_pred - b_ret) ** 2,
-                                           0.5 * (v_pred_clipped - b_ret) ** 2).mean()
+                # No value clipping — removed after v3/v4 showed it kills goal discovery.
+                # Mechanism: clip ε=0.1 limits V(s) to move 1.0/update cycle. With
+                # returns of 50 for goal states and V(s)≈-8, advantages=58 → policy
+                # ratio always clipped at 1.2 → small policy shift → entropy gradient
+                # wins → policy forgets goals after every burst. 1,500-episode droughts.
+                # LR floor (5e-5) already prevents value overfit by limiting late update
+                # magnitude. Value clip is redundant and harmful here.
+                v_pred = values.squeeze()
+                vl     = 0.5 * ((v_pred - b_ret) ** 2).mean()
                 loss  = pl + VALUE_COEF * vl - ENTROPY_COEF * entropy
 
                 self.optimizer.zero_grad()
@@ -311,8 +308,8 @@ def save_summary(episode_raw_rewards, episode_lengths, policy_losses, value_loss
         f"    State normalisation    : pos → [-1,1], vel → [-1,1]",
         f"    Reward shaping         : height + 100·KE - 1  (+10 at goal)",
         f"    Truncation fix         : terminated vs truncated in GAE bootstrap",
-        f"    LR schedule            : linear decay {LR} → 0 over {N_EPISODES} episodes",
-        f"    Value clipping         : v_pred clipped within CLIP_EPS of v_old",
+        f"    LR schedule            : {LR} → 5e-5 floor over {N_EPISODES} episodes",
+        f"    Value clipping         : None — removed (caused goal-forgetting, see bug #41)",
         "=" * 55,
     ]
     text = '\n'.join(lines)
