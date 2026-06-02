@@ -25,7 +25,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Hyperparameters
 LR         = 3e-4
 GAMMA      = 0.99
-N_EPISODES = 3000
+N_EPISODES = 5000
 MAX_STEPS  = 200
 SOLVED_AVG = -110.0
 
@@ -133,7 +133,7 @@ def train():
         policy_loss = -(torch.stack(log_probs) * advantages).sum()
         value_loss  = F.smooth_l1_loss(values_t, returns_t)
         entropy     = -torch.stack(log_probs).mean()   # H(π) estimate, high when exploratory
-        loss        = policy_loss + value_loss - 0.05 * entropy  # higher coef → more exploration
+        loss        = policy_loss + value_loss - 0.01 * entropy  # matches PPO fix: enough to explore, not so much it prevents consolidation
 
         optimizer.zero_grad()
         loss.backward()

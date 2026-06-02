@@ -7,3 +7,7 @@ echo "=== MC PPO done. Starting MC DQN (Double DQN, LR=5e-5) ==="
 
 python3 -u mountaincar/2_dqn.py 2>&1 | tee mc_dqn5_run.log
 echo "=== All done ==="
+
+echo "=== Starting MC AC (entropy=0.01, 5000 eps) ==="
+python3 -u mountaincar/3_actor_critic.py 2>&1 | tee mc_ac5_run.log
+echo "=== Sequential queue fully complete ==="
