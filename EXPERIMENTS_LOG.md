@@ -25,9 +25,9 @@ Use this when writing the report.
 | MountainCar | Q-Learning | ✗ Not solved | 50,000 | Best avg −130, last-100 avg −138 — confirmed tabular limit |
 | MountainCar | DQN | ⟳ **Running v5** | 8,000 | v3 config (raw rewards, hard target) + 8K eps |
 | MountainCar | Actor-Critic | ✗ **Structurally fails** | 5,000 | Known single-env A2C limitation. SB3 requires n_envs=16. |
-| MountainCar | PPO | ⟳ **Running v6** | 12,000 | v5 config + 12K eps — avg -151 at 8K, more budget |
+| MountainCar | PPO | ⟳ **Running v6** | 12,000 | LR_DECAY_STEPS=8000 fixed (bug #43), no value clip, 12K eps |
 
-**v6 PPO + v5 DQN started 2026-06-02 ~21:15 UTC**. Logs: `mc_ppo_v6_run.log`, `mc_dqn_v5_run.log`.
+**v6 PPO (restarted ~21:55 UTC with bug #43 fix) + v5 DQN (started ~21:15 UTC)**. Logs: `mc_ppo_v6_run.log`, `mc_dqn_v5_run.log`.
 
 **v3 runs started 2026-06-02 ~17:00 UTC** in `rl_runs` tmux (mc_dqn_v3, mc_ac_v3, mc_ppo_v3). Logs: `mc_*_v3_run.log`.
 
@@ -94,6 +94,7 @@ Every completed run saves to `results/<name>_<timestamp>/`:
 | 40 | MC DQN v3: Q-value scale inflates loss without collapsing performance | `2_dqn.py` | Loss 696 at ep 5,000 but last-100 avg -146.68 ± 6.31 (best stable DQN result). Loss is high because shaped rewards push Q-values into [20-50] range — correct values, not overestimation. But without normalisation, Q-value scale grows indefinitely. Eventually will cause policy degradation. | Running reward normalisation (Welford's online algorithm): z-score each shaped reward before replay buffer entry, clip ±10σ. Q-values represent normalised returns. Equivalent to SB3 VecNormalize. |
 | 41 | MC PPO v3/v4: value clipping causes cyclic goal-forgetting | `4_ppo.py` | Value clip ε=0.1 limits V(s) to move 1.0/update cycle. With goal returns=50 and V(s)≈-8, advantages=58 → policy ratio always clipped at 1.2 → policy shifts only log(1.2)=0.18 per epoch toward goal. Entropy gradient (constant) beats intermittent goal gradient. Policy finds goals in burst (18 in ep 2017-2050) then forgets for 1,500 eps. Cyclic. Total 26 goals in 4,600 eps vs 3,363 in v2 with no clip. LR floor (5e-5) already limits value overfit — value clip is redundant and harmful. | Remove value clipping entirely. PPO v5 = LR floor + no value clip = v2 + stability fix. |
 | 42 | MC DQN v4: reward normalisation removed directional signal | `2_dqn.py` | Welford z-score normalisation of shaped rewards resulted in mean-zero unit-variance rewards at every step. The agent could no longer distinguish "near goal" (high height + KE) from "at valley bottom" (low). All states looked the same from the reward signal. Agent never found goal in 5,000 episodes (avg -200 throughout) while loss stayed flat at 1.4. High loss in v3 (~700) reflected correctly large Q-values, not overestimation. | Reverted to raw shaped rewards. Extended to 8K episodes. |
+| 43 | MC PPO v6: LR decay tied to N_EPISODES causes divergent trajectories | `4_ppo.py` | LR formula `LR_MIN + (LR-LR_MIN)*(1-ep/N_EPISODES)` means changing N_EPISODES changes the LR at every step. v5 (N=8000) at ep 1000: LR=2.6875e-4. v6 (N=12000) at ep 1000: LR=2.792e-4. This tiny difference per step creates butterfly-effect trajectory divergence. v5 found goals at ep 416 and sustained them. v6 found goals at ep 811 and cycled. Same seed, same architecture, same intended config — different outcomes purely from LR schedule coupling to N_EPISODES. Confirmed by Henderson 2018: "implementation details and random seeds dominate". | Changed to `LR_DECAY_STEPS=8000` (constant). LR at any episode now identical to v5. ep 0-8000: identical LR; ep 8000-12000: holds at floor 5e-5 (fine-tuning phase). |
 
 ### Round 1 — Code Quality
 
@@ -172,14 +173,15 @@ Truncation fix: V(final_state) bootstrap on timeout
 GAE(λ=0.95) replaces full MC returns
 ```
 
-### MountainCar PPO (v5 — current)
+### MountainCar PPO (v6 — current)
 ```
 Network: 2 → 64 → 64 → 3  (Tanh, orthogonal init)
-LR: 5e-5 + 2.5e-4*(1 - ep/N) → floor 5e-5  ← prevents entropy collapse AND value overfit
+LR: 5e-5 + 2.5e-4*(1 - ep/LR_DECAY_STEPS) where LR_DECAY_STEPS=8000 (fixed)  ← bug #43 fix
+  ep 0-8000: identical LR profile to v5; ep 8000-12000: holds at floor 5e-5
 γ=0.99, λ=0.95, clip=0.2, entropy=0.01, VALUE_COEF=0.5
 Value clipping: NONE  ← removed (caused cyclic goal-forgetting, bug #41)
 Update every 1,024 steps, 10 epochs, batch 64
-N_EPISODES=8,000, MAX_STEPS=200
+N_EPISODES=12,000, MAX_STEPS=200
 State normalisation: pos → [−1,1], vel → [−1,1]
 Reward shaping: height + 100·KE − 1  (+10 at goal)
 Truncation fix: terminated vs truncated in GAE bootstrap
@@ -233,7 +235,8 @@ Truncation fix: terminated vs truncated in GAE bootstrap
 | v3 | 8,000 | ~-153 | -200 | LR decay to 0 → entropy collapse (0.0032). Only 26 goals. Bug #39 |
 | v4 (killed @4600) | 4,600 | ~-190 | n/a | LR floor fixed but value clip 0.1 → goal-forgetting cycles (bug #41). 26 goals |
 | v5 | 8,000 | -151.80 | -151.80 | LR floor + no value clip. 4,816 goals. No regression. Best PPO stability. |
-| **v6** | 12,000 | ⟳ | ⟳ | **v5 config + 12K eps — more budget to consolidate below -110** |
+| v6 (killed @3250) | 3,250 | ~-185 | n/a | LR tied to N_EPISODES (bug #43) — trajectory diverged from v5. Cycling pattern. |
+| **v6 restart** | 12,000 | ⟳ | ⟳ | **LR_DECAY_STEPS=8000 fixed. ep 3,650+, finding goals intermittently.** |
 
 ---
 
@@ -275,4 +278,6 @@ With reward shaping (`height + 100·KE − 1`), all deep RL algorithms can learn
 
 11. **Q-value runaway requires stable targets** (Mnih 2015). Soft target update (TAU=0.005) causes target to chase inflating online Q-values — no stable reference. Hard update every 500 steps fixes target at a historical snapshot, breaking the feedback loop. Goal bonus must also be small (+2 not +10) to avoid initial TD shock.
 
-12. **Single-environment A2C cannot solve MountainCar — this is structural, not a bug.** Confirmed across all runs (v1–v3, 20,000+ total episodes, zero goals). Root cause is a zero-advantage fixed point: critic converges to V(s) for the current bad policy by ep ~600, advantages → 0, policy gradient → 0. This is mathematically inevitable regardless of LR, VALUE_COEF, or entropy settings. The only escape is environmental diversity. RL Baselines3 Zoo requires `n_envs: 16` specifically for this environment (confirmed via web search). The A3C paper (Mnih 2016) motivated parallelism as the structural solution — not an optimisation. Contrast with PPO: multi-epoch updates over 1,024-step buffers spanning episode boundaries provide implicit diversity from a single environment. This is one of the deepest algorithmic insights in the dissertation: the structural difference between A2C's need for parallelism vs PPO's epoch-reuse mechanism. Cite: Mnih 2016, Dann et al. 2022, RL Baselines3 Zoo a2c.yml.
+12. **PPO on MountainCar exhibits cyclic goal-forgetting from a single environment.** The policy discovers goal-reaching behavior in bursts (78 goals in 500 eps), improves avg to −184, then loses the skill for 1,500+ episodes. Root cause: with 1,024-step buffers and ~190 steps/episode, each update spans ~5 episodes. With ~1 goal per 200 episodes, 97% of updates contain no goal episodes — the entropy gradient continuously erodes goal behavior while policy gradients toward goals are rare. The policy oscillates between brief goal-discovery and long forgetting. v5 escaped this cycle (found goals at ep 416, sustained for 8,000 eps) through a favorable stochastic trajectory. v6 (identical config, slightly different LR due to N_EPISODES coupling) cycled throughout. This confirms Henderson et al. 2018: "random seeds and implementation details dominate results." The same algorithm with the same hyperparameters produced 4,816 goals (v5) vs ~95 goals (v6) purely from trajectory divergence.
+
+13. **Single-environment A2C cannot solve MountainCar — this is structural, not a bug.** Confirmed across all runs (v1–v3, 20,000+ total episodes, zero goals). Root cause is a zero-advantage fixed point: critic converges to V(s) for the current bad policy by ep ~600, advantages → 0, policy gradient → 0. This is mathematically inevitable regardless of LR, VALUE_COEF, or entropy settings. The only escape is environmental diversity. RL Baselines3 Zoo requires `n_envs: 16` specifically for this environment (confirmed via web search). The A3C paper (Mnih 2016) motivated parallelism as the structural solution — not an optimisation. Contrast with PPO: multi-epoch updates over 1,024-step buffers spanning episode boundaries provide implicit diversity from a single environment. This is one of the deepest algorithmic insights in the dissertation: the structural difference between A2C's need for parallelism vs PPO's epoch-reuse mechanism. Cite: Mnih 2016, Dann et al. 2022, RL Baselines3 Zoo a2c.yml.

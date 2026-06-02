@@ -196,11 +196,15 @@ def train():
     print("=" * 55)
 
     for episode in range(N_EPISODES):
-        # Linear LR decay: 3e-4 → 5e-5 floor over training (Engstrom 2020).
-        # Decays to floor (not zero) — zero LR in v3 starved early goal-finding
-        # (only 26 goals vs 3,363 in v2). Floor of 5e-5 keeps updates meaningful.
+        # LR decay decoupled from N_EPISODES — uses fixed LR_DECAY_STEPS=8000.
+        # Previously tied to N_EPISODES, so changing N_EPISODES changed the LR
+        # at every step, causing divergent trajectories vs v5 (butterfly effect).
+        # v5 (N=8000) found goals at ep 1000; v6 (N=12000) with same code found
+        # 0 goals at ep 1000 because LR was 1e-5 higher at every step.
+        # Now: ep 0-8000 has identical LR to v5; ep 8000-12000 holds at floor (fine-tuning).
         LR_MIN = 5e-5
-        current_lr = LR_MIN + (LR - LR_MIN) * max(0.0, 1.0 - episode / N_EPISODES)
+        LR_DECAY_STEPS = 8000
+        current_lr = LR_MIN + (LR - LR_MIN) * max(0.0, 1.0 - episode / LR_DECAY_STEPS)
         agent.optimizer.param_groups[0]['lr'] = current_lr
 
         state, _      = env.reset()
