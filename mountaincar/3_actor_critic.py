@@ -23,15 +23,16 @@ plt.rcParams.update(PLT_STYLE)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Hyperparameters
-ACTOR_LR   = 3e-4    # actor learns faster — keeps advantages non-zero while critic catches up
-CRITIC_LR  = 1e-4    # critic learns slower — prevents converging to bad policy's V(s) too quickly
-VALUE_COEF = 0.5     # standard from Schulman 2017 — reduces critic dominance in combined loss
-ENTROPY_COEF = 0.02  # slightly higher than 0.01 — maintains stochasticity to escape zero-advantage trap
-GAMMA      = 0.99
-LAM        = 0.95    # GAE lambda — trades variance for bias; 0.95 is standard
-N_EPISODES = 5000
-MAX_STEPS  = 200
-SOLVED_AVG = -110.0
+ACTOR_LR     = 3e-4
+CRITIC_LR    = 1e-4
+VALUE_COEF   = 0.5
+ENTROPY_COEF = 0.02
+GAMMA        = 0.99
+LAM          = 0.95
+N_EPISODES   = 5000
+MAX_STEPS    = 200
+SOLVED_AVG   = -110.0
+BATCH_EPISODES = 8   # collect this many episodes before each gradient update
 
 
 class ActorCritic(nn.Module):
@@ -89,8 +90,9 @@ def train():
     actor_losses        = []
     critic_losses       = []
     solve_ep            = None
+    episode_buffer      = []   # accumulates BATCH_EPISODES before each update
 
-    print(f"MountainCar Actor-Critic | Device: {DEVICE}")
+    print(f"MountainCar Actor-Critic (batch={BATCH_EPISODES}) | Device: {DEVICE}")
     print("=" * 55)
 
     for episode in range(N_EPISODES):
@@ -116,7 +118,7 @@ def train():
             log_probs.append(dist.log_prob(action))
             values.append(value)
             s_rewards.append(s_rew)
-            step_entropies.append(dist.entropy())   # exact H(π) per step, not noisy -log_prob
+            step_entropies.append(dist.entropy())
 
             state      = next_state
             raw_total += raw_reward
@@ -127,9 +129,6 @@ def train():
         episode_raw_rewards.append(raw_total)
         episode_lengths.append(steps)
 
-        # Bootstrap: if truncated (timeout, not a real terminal), V(final_state) ≠ 0.
-        # Zeroing it out (treating timeout as terminal) underestimates all values in
-        # the episode, creating systematic bias in the critic and noisy advantages.
         if truncated and not terminated:
             final_norm = normalize_state(state)
             final_t    = torch.from_numpy(final_norm).float().unsqueeze(0).to(DEVICE)
@@ -139,41 +138,51 @@ def train():
         else:
             bootstrap = 0.0
 
-        # GAE(λ=0.95): lower variance than full MC returns at the cost of a small bias.
-        # Critical for long episodes (150–200 steps) where MC variance is enormous.
-        # all_vals already encodes terminal/truncation correctly via bootstrap value.
-        # Processing a single episode backward — no cross-episode masking needed.
-        all_vals = [v.item() for v in values] + [bootstrap]
-        advantages_list, gae = [], 0.0
-        for t in reversed(range(len(s_rewards))):
-            delta = s_rewards[t] + GAMMA * all_vals[t + 1] - all_vals[t]
-            gae   = delta + GAMMA * LAM * gae
-            advantages_list.insert(0, gae)
+        episode_buffer.append((log_probs, values, s_rewards, step_entropies, bootstrap))
 
-        returns_list = [a + v for a, v in zip(advantages_list, [v.item() for v in values])]
-        returns_t    = torch.tensor(returns_list, dtype=torch.float32, device=DEVICE)
-        values_t     = torch.cat(values).squeeze(-1)
+        if len(episode_buffer) < BATCH_EPISODES:
+            # not enough episodes yet; defer update
+            actor_losses.append(0.0)
+            critic_losses.append(0.0)
+        else:
+            # concatenate all BATCH_EPISODES episodes; compute GAE per episode,
+            # normalize advantages across the full batch so that goal-reaching
+            # episodes retain non-zero advantage even when most episodes return -200.
+            all_log_probs, all_values, all_advantages, all_returns, all_entropies = [], [], [], [], []
 
-        advantages_t = torch.tensor(advantages_list, dtype=torch.float32, device=DEVICE)
-        advantages_t = (advantages_t - advantages_t.mean()) / (advantages_t.std() + 1e-8)
+            for ep_lp, ep_val, ep_rew, ep_ent, ep_boot in episode_buffer:
+                all_v = [v.item() for v in ep_val] + [ep_boot]
+                gae, ep_adv = 0.0, []
+                for t in reversed(range(len(ep_rew))):
+                    delta = ep_rew[t] + GAMMA * all_v[t + 1] - all_v[t]
+                    gae   = delta + GAMMA * LAM * gae
+                    ep_adv.insert(0, gae)
+                ep_ret = [a + v.item() for a, v in zip(ep_adv, ep_val)]
+                all_log_probs.extend(ep_lp)
+                all_values.extend(ep_val)
+                all_advantages.extend(ep_adv)
+                all_returns.extend(ep_ret)
+                all_entropies.extend(ep_ent)
 
-        # squeeze(-1): log_probs and step_entropies are [T,1] from batch_size=1 Categorical.
-        # Without squeeze, [T,1] * [T] broadcasts to [T,T] outer product — policy gradient
-        # becomes sum(log_probs) * sum(advantages) ≈ 0 since normalized advantages sum to 0.
-        # .mean() instead of .sum() keeps loss scale independent of episode length.
-        log_probs_t = torch.stack(log_probs).squeeze(-1)          # [T]
-        entropy     = torch.stack(step_entropies).squeeze(-1).mean()  # scalar
-        policy_loss = -(log_probs_t * advantages_t).mean()
-        value_loss  = F.smooth_l1_loss(values_t, returns_t)
-        loss        = policy_loss + VALUE_COEF * value_loss - ENTROPY_COEF * entropy
+            returns_t    = torch.tensor(all_returns, dtype=torch.float32, device=DEVICE)
+            values_t     = torch.cat(all_values).squeeze(-1)
+            advantages_t = torch.tensor(all_advantages, dtype=torch.float32, device=DEVICE)
+            advantages_t = (advantages_t - advantages_t.mean()) / (advantages_t.std() + 1e-8)
+            log_probs_t  = torch.stack(all_log_probs).squeeze(-1)
+            entropy      = torch.stack(all_entropies).squeeze(-1).mean()
 
-        optimizer.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
-        optimizer.step()
+            policy_loss = -(log_probs_t * advantages_t).mean()
+            value_loss  = F.smooth_l1_loss(values_t, returns_t)
+            loss        = policy_loss + VALUE_COEF * value_loss - ENTROPY_COEF * entropy
 
-        actor_losses.append(policy_loss.item())
-        critic_losses.append(value_loss.item())
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
+            optimizer.step()
+
+            actor_losses.append(policy_loss.item())
+            critic_losses.append(value_loss.item())
+            episode_buffer = []
 
         if (episode + 1) % 100 == 0:
             avg_raw = np.mean(episode_raw_rewards[-100:]) if len(episode_raw_rewards) >= 100 else np.mean(episode_raw_rewards)
@@ -224,6 +233,7 @@ def save_summary(episode_raw_rewards, episode_lengths, actor_losses, critic_loss
         f"  Final mean critic loss   : {np.mean(critic_losses[-50:]):.4f}",
         "",
         "  Hyperparameters",
+        f"    Batch episodes         : {BATCH_EPISODES}  (update every N episodes)",
         f"    Actor LR / Critic LR   : {ACTOR_LR} / {CRITIC_LR}",
         f"    Value coef             : {VALUE_COEF}",
         f"    Entropy coef           : {ENTROPY_COEF}",
