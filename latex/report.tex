@@ -16,7 +16,7 @@
 \usepackage{booktabs}
 \usepackage{float}
 \usepackage{subcaption}
-\usepackage{microtype}
+\usepackage[protrusion=true,expansion=false]{microtype}
 \usepackage{xcolor}
 \usepackage{enumitem}
 \usepackage{array}
@@ -88,7 +88,7 @@ Word Count: approx.\ 12,000
 % ============================================================
 \begin{abstract}
 \noindent
-This dissertation presents a rigorous empirical comparison of four reinforcement learning algorithms---tabular Q-Learning, Deep Q-Network (DQN) with Double DQN correction, Advantage Actor-Critic (A2C), and Proximal Policy Optimisation (PPO)---across three environments of strictly increasing complexity: a custom $6\times6$ GridWorld, CartPole-v1, and MountainCar-v0 from OpenAI Gymnasium. The study makes three contributions. First, it provides a clean comparative benchmark, demonstrating that all four algorithms solve GridWorld and CartPole with solution episodes ranging from 195 (PPO, fastest) to 9,798 (Q-Learning, slowest), a 50-fold difference that reflects the sample efficiency advantages of policy gradient methods with multi-epoch updates. Second, it documents 43 implementation bugs discovered and corrected across the four algorithms, ranging from a tensor broadcasting error that silently zeroed all A2C policy gradients for 5,000 episodes, to a Q-value overestimation cascade that destroyed DQN performance in 1,500 episodes, to a learning-rate schedule coupling that caused divergent training trajectories through the butterfly effect. Each bug is theoretically grounded in the literature. Third, it empirically reproduces seven distinct pathologies documented in the deep RL literature---Q-value overestimation (van Hasselt et al., 2016), truncation bias (Pardo et al., 2018), reward hacking (Ng et al., 1999; Forbes et al., 2025), Monte Carlo return variance (Schulman et al., 2015), entropy coefficient sensitivity, replay buffer capacity effects (Zhang \& Sutton, 2019), and implementation sensitivity (Henderson et al., 2018; Engstrom et al., 2020)---using controlled ablation studies. MountainCar-v0 is not solved by any algorithm within the evaluated budgets, and the dissertation argues this is theoretically expected: the best results are PPO at mean $-151.8$ reward (4,816 goal discoveries, no regression) and Double DQN at a stable mean $-146.7$ (last 100 episodes). A2C is shown to fail structurally on a single environment due to a zero-advantage fixed point, replicating the findings that motivated the A3C parallelism architecture.
+This dissertation presents a rigorous empirical comparison of four reinforcement learning algorithms---tabular Q-Learning, Deep Q-Network (DQN) with Double DQN correction, Advantage Actor-Critic (A2C), and Proximal Policy Optimisation (PPO)---across three environments of strictly increasing complexity: a custom $6\times6$ GridWorld, CartPole-v1, and MountainCar-v0 from OpenAI Gymnasium. The study makes three contributions. First, it provides a clean comparative benchmark, demonstrating that all four algorithms solve GridWorld and CartPole with solution episodes ranging from 195 (PPO, fastest) to 9,798 (Q-Learning, slowest), a 50-fold difference that reflects the sample efficiency advantages of policy gradient methods with multi-epoch updates. Second, it documents 44 implementation bugs discovered and corrected across the four algorithms, ranging from a tensor broadcasting error that silently zeroed all A2C policy gradients for 5,000 episodes, to a Q-value overestimation cascade that destroyed DQN performance in 1,500 episodes, to a learning-rate schedule coupling that caused divergent training trajectories through the butterfly effect. Each bug is theoretically grounded in the literature. Third, it empirically reproduces seven distinct pathologies documented in the deep RL literature---Q-value overestimation (van Hasselt et al., 2016), truncation bias (Pardo et al., 2018), reward hacking (Ng et al., 1999; Forbes et al., 2025), Monte Carlo return variance (Schulman et al., 2015), entropy coefficient sensitivity, replay buffer capacity effects (Zhang \& Sutton, 2019), and implementation sensitivity (Henderson et al., 2018; Engstrom et al., 2020)---using controlled ablation studies. MountainCar-v0 is not solved by any algorithm within the evaluated budgets, and the dissertation argues this is theoretically expected: the best results are PPO at mean $-151.8$ reward (4,816 goal discoveries, no regression) and Double DQN at a stable mean $-146.7$ (last 100 episodes). A2C is shown to fail structurally on a single environment due to a zero-advantage fixed point, replicating the findings that motivated the A3C parallelism architecture.
 \end{abstract}
 
 \tableofcontents
@@ -109,7 +109,7 @@ The key contributions are:
 \begin{enumerate}
   \item \textbf{A clean comparative benchmark} across 12 environment-algorithm combinations, with solved episode counts and performance statistics that are directly comparable across algorithms because all implementations share identical environments, reward functions (where applicable), and evaluation protocols.
 
-  \item \textbf{A documented debugging audit of 43 implementation bugs}, each classified by severity, root cause, and the specific experiment that revealed it. This audit constitutes a practical guide to the failure modes of these four algorithms that goes beyond what any single paper documents.
+  \item \textbf{A documented debugging audit of 44 implementation bugs}, each classified by severity, root cause, and the specific experiment that revealed it. This audit constitutes a practical guide to the failure modes of these four algorithms that goes beyond what any single paper documents.
 
   \item \textbf{Empirical reproduction of seven literature pathologies} using controlled ablations. Each pathology is demonstrated with a failing run, explained theoretically, corrected with a specific code change, and confirmed with a passing run.
 \end{enumerate}
@@ -248,6 +248,13 @@ All algorithms are evaluated on raw (unshaped) rewards throughout training. A ru
 
 Q-Learning solves GridWorld in 3,000 episodes, achieving a 100\% goal rate in the final 100 episodes with mean steps of 10.0 and mean reward of $9.07 \pm 0.17$. The agent exhibits the classic exploration-exploitation tradeoff: initial random exploration ($\varepsilon=1.0$) discovers the goal via random walk, and the Q-table then concentrates value along the shortest path as $\varepsilon$ decays.
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{figures/gridworld_training.pdf}
+\caption{GridWorld Q-Learning training curves. \textit{Left}: per-episode reward with 50-episode moving average. \textit{Right}: steps to reach the goal (or timeout), showing rapid convergence to the near-optimal 10-step path.}
+\label{fig:gridworld}
+\end{figure}
+
 \subsection{CartPole}
 
 All four algorithms solve CartPole. Table~\ref{tab:cartpole} summarises the results.
@@ -271,6 +278,23 @@ PPO        & \textbf{195}    & $197.1 \pm 117.8$ & 47/100 & \textbf{Fastest. 9 p
 \textbf{PPO} is the fastest by a wide margin (ep.\ 195, 9 policy updates). The multi-epoch update reuses each trajectory batch 10 times, giving far greater sample efficiency than the single-pass update used by DQN. \textbf{DQN} is second (ep.\ 225), exploiting off-policy replay to efficiently reuse experience. \textbf{A2C} (ep.\ 1,175) is slower due to the on-policy constraint and single-sample gradient updates. \textbf{Q-Learning} (ep.\ 9,798) is slowest by two orders of magnitude, constrained by the coarse discretisation (40,000 states) and the need to visit each state multiple times before Q-values converge.
 
 The 50-fold difference in solution episode between PPO and Q-Learning ($195$ vs.\ $9,798$) illustrates the compounding advantages of: (i) continuous function approximation over discretisation, (ii) multi-epoch updates over single-pass, and (iii) policy gradient methods that directly maximise the objective over value-based methods that solve it indirectly.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.55\linewidth}
+  \includegraphics[width=\linewidth]{figures/cartpole_all_algorithms.pdf}
+  \caption{Learning curves (moving average). Vertical dashed lines mark each algorithm's solution episode.}
+  \label{fig:cartpole_curves}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.42\linewidth}
+  \includegraphics[width=\linewidth]{figures/cartpole_sample_efficiency.pdf}
+  \caption{Episodes to solve (log scale). PPO is 50$\times$ faster than Q-Learning.}
+  \label{fig:cartpole_bar}
+\end{subfigure}
+\caption{CartPole-v1: All four algorithms. PPO solves fastest (ep.\ 195) by reusing each collected batch across 10 epochs. Q-Learning is limited by state aliasing from its coarse discretisation.}
+\label{fig:cartpole}
+\end{figure}
 
 \subsection{MountainCar}
 
@@ -298,6 +322,13 @@ PPO (v5)   & 8,000 ep  & $-162.8 \pm 36.9$ & $\mathbf{-151.8 \pm 29.4}$ & $-148$
 
 \textbf{A2C} produces zero goals in 5,000 episodes and maintains $-200.0$ mean reward throughout. This is a structural failure caused by the zero-advantage fixed point (Section~\ref{sec:ac_structural}), not an implementation error. Single-environment A2C cannot provide the trajectory diversity required to generate non-zero advantages in a hard-exploration environment. The actor loss converges to exactly $0$ by episode 600 and remains there.
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{figures/mountaincar_comparison.pdf}
+\caption{MountainCar-v0: best result per algorithm (first 10,000 episodes). Q-Learning uses raw rewards; DQN and PPO use shaped rewards. The $-110$ solved threshold (dotted line) is not reached by any algorithm. DQN achieves the best stable mean ($-146.7$); PPO achieves the most goal discoveries (4,816).}
+\label{fig:mountaincar_comparison}
+\end{figure}
+
 \textbf{PPO} (v5) achieves the best result: $-151.8 \pm 29.4$ at episode 8,000 with 4,816 goal discoveries and no late-stage regression. The LR schedule (decaying from $3\times10^{-4}$ to a floor of $5\times10^{-5}$ over a fixed 8,000-step window) prevents the catastrophic policy destruction observed in earlier runs. PPO discovers goals in dense bursts from episode $\sim$1,000 onwards and maintains $\sim$650 goals per 1,000-episode window throughout the run. Extending to 12,000 episodes (v6) replicated the first 8,000 episodes (6,764 total goals) but the additional fine-tuning phase at floor LR eroded rather than consolidated the policy: goal discovery dropped from 752/window to 176/window then zero, ending at $-200$ last-100 average. The 8,000-episode configuration is optimal.
 
 \subsubsection{Benchmark Contextualisation}
@@ -309,7 +340,7 @@ The RL Baselines3 Zoo reports that PPO on MountainCar-v0 requires 500,000--1,000
 \label{sec:debugging}
 % ============================================================
 
-Over the course of this project, 43 implementation bugs were identified and corrected. This section documents the most impactful, categorised by algorithm and theoretical significance. The complete audit is maintained in \texttt{EXPERIMENTS\_LOG.md}.
+Over the course of this project, 44 implementation bugs were identified and corrected. This section documents the most impactful, categorised by algorithm and theoretical significance. The complete audit is maintained in \texttt{EXPERIMENTS\_LOG.md}.
 
 \subsection{CartPole DQN: Replay Buffer and Initialisation Bugs}
 
@@ -336,6 +367,13 @@ Three bugs combining to cause Q-value runaway in successive DQN runs:
 
 \textbf{Bugs \#33--35 (v3/v4)}: Even with Double DQN, the soft target update (\texttt{TAU=0.005}) caused the target network to slowly chase the inflating online network, providing no stable reference. Q-values grew from loss $\approx 1$ at episode 1,500 to loss 2,107 at episode 3,500 before destroying performance. Fix: hard target copy every 500 steps; LR reduced to $2\times10^{-5}$; goal bonus reduced to $+2$.
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{figures/dqn_overestimation.pdf}
+\caption{Q-value overestimation in standard vs.\ Double DQN. \textit{Left}: Huber loss on symlog scale — standard DQN loss diverges to 2,491; Double DQN stabilises at $\sim$700. \textit{Right}: corresponding performance — standard DQN plateaus at $-134$, Double DQN achieves $-146.7$ without runaway.}
+\label{fig:dqn_overestimation}
+\end{figure}
+
 \textbf{Bug \#42}: Reward normalisation (Welford online z-score) was introduced in an attempt to prevent Q-value magnitude growth. Result: all shaped rewards were zero-meaned per running statistics, eliminating the directional signal that distinguishes ``near goal'' states from ``valley bottom'' states. Agent never found the goal in 5,000 episodes. Fix: revert to raw shaped rewards.
 
 \subsection{MountainCar A2C: Silent Zero Gradient Bug}
@@ -360,11 +398,18 @@ Since normalised advantages have exactly zero mean ($\sum_j A_j = 0$), the polic
 
 Even after correcting all 14 bugs affecting A2C, the algorithm fails completely on MountainCar with a single environment. The failure is structural, not implementational.
 
-The mechanism is the \textit{zero-advantage fixed point}. With a near-uniform policy at initialisation, the critic quickly learns $V(s) \approx \mathbb{E}[G_t | \pi_{\text{uniform}}]$ for all states. Once the critic is accurate, the advantage $A(s,a) = Q(s,a) - V(s) \approx 0$ for all transitions. After normalisation, $(0 - 0)/(σ + \varepsilon) \rightarrow 0$. The policy loss becomes identically zero. Only the entropy gradient remains, pushing the policy back toward uniformity. The system is at a fixed point.
+The mechanism is the \textit{zero-advantage fixed point}. With a near-uniform policy at initialisation, the critic quickly learns $V(s) \approx \mathbb{E}[G_t | \pi_{\text{uniform}}]$ for all states. Once the critic is accurate, the advantage $A(s,a) = Q(s,a) - V(s) \approx 0$ for all transitions. After normalisation, $(0 - 0)/(\sigma + \varepsilon) \rightarrow 0$. The policy loss becomes identically zero. Only the entropy gradient remains, pushing the policy back toward uniformity. The system is at a fixed point.
 
 The only escape requires trajectory diversity: different episodes must produce meaningfully different returns so the critic's baseline is imperfect and advantages are non-zero. The RL Baselines3 Zoo requires \texttt{n\_envs=16} specifically for MountainCar-v0, providing simultaneous experience from 16 different starting positions. With $n_{\text{envs}}=1$, escaping the fixed point requires accidentally reaching the goal before the critic converges---an event with probability near zero for a random walk in 200 steps.
 
 The actor loss CSV confirms this: mean actor loss reaches $0.000023$ by episode 600 and remains at $\approx 0$ for all 5,000 episodes, while the critic loss converges to $0.017$. A perfect critic tracking a bad policy is the signature of this failure mode.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{figures/ac_structural_failure.pdf}
+\caption{A2C structural failure on MountainCar. \textit{Left}: v3 (all bugs fixed) vs.\ run 4 (outer product bug, random exploration only) — both hover at $-200$, confirming the failure is structural. \textit{Right}: A2C v3 actor and critic loss on log scale — critic converges by episode 600; actor loss drops to zero and remains there for 4,400 episodes.}
+\label{fig:ac_failure}
+\end{figure}
 
 \subsection{MountainCar PPO: Reward Shaping and Optimal Policy Invariance}
 \label{sec:shaping_bugs}
@@ -379,6 +424,23 @@ This result provides direct empirical support for the theoretical warning of Ng 
 \textbf{Bug \#39}: Decaying learning rate to exactly zero caused entropy collapse. With LR $\rightarrow 0$, even the entropy bonus gradient update becomes negligible. The policy converges deterministically. Final entropy: $0.0032$ (vs.\ $0.154$ in working runs). Only 26 goals discovered in 8,000 episodes. Fix: LR floor at $5\times10^{-5}$.
 
 \textbf{Bug \#41 (Value clipping backfire)}: Value function clipping with $\varepsilon_V=0.1$ limited the value network to update by at most $\varepsilon_V \cdot n_{\text{epochs}} = 1.0$ per update cycle. With goal episode returns of $\sim+50$ and $V(s) \approx -8$, the advantage for goal states was $\sim58$, causing the policy probability ratio to always saturate at $1 + \varepsilon = 1.2$. The effective policy gradient toward goal behavior was $\log(1.2) \approx 0.18$ per epoch. The constant entropy gradient ($0.01 \times \nabla\mathcal{H}$) exceeded this, slowly eroding goal behavior between discoveries. Result: cyclic bursts (78 goals in episodes 2000--2500) followed by 1,500-episode droughts with zero goals. Total: 26 goals versus 3,363 in the configuration without value clipping. The fix: remove value clipping entirely. The LR floor already prevents value overfit by reducing update magnitude late in training.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.55\linewidth}
+  \includegraphics[width=\linewidth]{figures/ppo_comparison.pdf}
+  \caption{PPO v2 (fixed LR, no implementation fixes) vs.\ v5 (LR floor + all fixes). v2 reaches avg $-153$ then catastrophically regresses at ep 5,300. v5 maintains consistent goal discovery throughout 8,000 episodes.}
+  \label{fig:ppo_comparison}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.42\linewidth}
+  \includegraphics[width=\linewidth]{figures/ppo_entropy_comparison.pdf}
+  \caption{Entropy collapse in v3 (LR$\to$0) vs.\ healthy entropy in v5 (LR floor). v3 final entropy: 0.003 (near-deterministic); v5 maintains $\sim$0.15 throughout.}
+  \label{fig:ppo_entropy}
+\end{subfigure}
+\caption{PPO implementation fixes. Left: effect on average reward and goal discovery. Right: entropy collapse from LR$\to$0 (Bug \#39) vs.\ stable entropy with LR floor.}
+\label{fig:ppo_fixes}
+\end{figure}
 
 \textbf{Bug \#44 (Extending budget past optimal stopping point)}: Running DQN to 8,000 episodes (v5) after the optimal result at 5,000 (v3) allowed Q-value overestimation to compound further: loss 696 (ep 5K) $\rightarrow$ 1,308 (ep 8K); mean reward $-146.7$ (ep 5K) $\rightarrow$ $-182.4$ (ep 8K). Similarly, PPO at 12,000 episodes (v6) found 6,764 goals but the extended fine-tuning phase at floor LR eroded the policy. In hard-exploration environments with reward-shaping-driven Q-value growth, more training is not monotonically beneficial. Fix: report v3 DQN (5K eps) and v5 PPO (8K eps) as the definitive results.
 
@@ -413,7 +475,7 @@ This contrasts sharply with PPO, which finds 4,816 goals in the same environment
 
 \subsection{The Role of Implementation Detail}
 
-The 43-bug audit establishes that implementation detail is not a secondary concern in deep RL---it is the primary determinant of whether an algorithm succeeds. The five most impactful bugs by outcome severity were:
+The 44-bug audit establishes that implementation detail is not a secondary concern in deep RL---it is the primary determinant of whether an algorithm succeeds. The five most impactful bugs by outcome severity were:
 
 \begin{enumerate}
   \item \textbf{Bug \#29} (outer product policy gradient): 5,000 episodes with zero policy gradient
@@ -435,7 +497,7 @@ The best PPO result ($-151.8$ avg, 4,816 goals, no regression) represents a poli
 \label{sec:conclusion}
 % ============================================================
 
-This dissertation has presented a comprehensive empirical evaluation of four reinforcement learning algorithms across three environments, accompanied by a systematic debugging audit of 43 implementation errors.
+This dissertation has presented a comprehensive empirical evaluation of four reinforcement learning algorithms across three environments, accompanied by a systematic debugging audit of 44 implementation errors.
 
 The main findings are:
 
