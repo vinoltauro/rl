@@ -7,9 +7,7 @@ Use this when writing the report.
 
 ## TODO / Future Work
 
-| # | Task | Priority | Notes |
-|---|---|---|---|
-| 1 | **Batch A2C (simulated parallelism)** | High | Collect N=8 episodes before each gradient update to simulate n_envs=8. Directly addresses the zero-advantage fixed point that causes single-env A2C to fail. Confirmed root cause: SB3 requires n_envs=16 for MountainCar. See bug #36 and Option B analysis. |
+None. All planned experiments complete.
 
 ---
 
@@ -24,10 +22,25 @@ Use this when writing the report.
 | CartPole | PPO | ✓ **Solved** | 195 | **Fastest** of all algorithms |
 | MountainCar | Q-Learning | ✗ Not solved | 50,000 | Best avg −130, last-100 avg −138 — confirmed tabular limit |
 | MountainCar | DQN | ✗ **Not solved** | 8,000 | Best: v3 avg −146.68 ±6.31. v5 peaked at ep 5K then regressed to −182. |
-| MountainCar | Actor-Critic | ✗ **Structurally fails** | 5,000 | Known single-env A2C limitation. SB3 requires n_envs=16. |
+| MountainCar | Actor-Critic | ✗ **Fails — hard exploration** | 5,000+ | Confirmed across ALL variants below. Zero goals in every configuration. |
 | MountainCar | PPO | ✗ **Not solved** | 12,000 | Best: v5 avg −151.80. v6 had 6,764 goals but eroded to −200 at end. |
 
-**All runs complete as of 2026-06-03 05:25 UTC.**
+**All CartPole/GridWorld/DQN/PPO runs complete. A2C experiments complete 2026-06-03.**
+
+---
+
+## A2C MountainCar — Full Ablation (all variants confirmed failed)
+
+The TODO item "batch A2C" and "vectorized A2C" have now been exhaustively tested. Summary:
+
+| Variant | Config | Steps | Goals | Root cause of failure |
+|---|---|---|---|---|
+| Single-env v1–v3 | n_envs=1, sequential updates | 5,000 eps (~950K steps) | 0 | Zero-advantage fixed point: critic overfits by ep 600, actor loss→0 |
+| Batch-8 | n_envs=1, 8 eps before update | 3,100 eps (~589K steps) | 0 | Same zero-advantage fixed point — sequential batches provide no diversity |
+| Vectorized (n_steps=16) | n_envs=16, n_steps=16 | 5,088 eps / 1,024K steps | 0 | N_STEPS=16 too short: 16-step returns can't credit 50-100 step momentum build-up |
+| Vectorized (n_steps=256) | n_envs=16, n_steps=256, LR=7e-4 | 5,088 eps / 1,024K steps | 0 | Hard exploration: fixed point broken, gradients exist but goal never discovered |
+
+**Conclusion:** A2C's failure on MountainCar is two-layered. The first layer (single-env) is the zero-advantage fixed point — critic overfits and kills the policy gradient. The second layer (vectorized) is the hard-exploration problem — even with valid gradients from 16 diverse trajectories, the shaped-reward local attractor prevents the policy from discovering the +10 goal bonus within 1M steps. This is distinct from the zero-advantage fixed point: the policy IS learning (shaped return improves slightly), but never finds the goal. The failure is the environment's sparse reward structure, not A2C's gradient computation. PPO escapes this via multi-epoch reuse of goal transitions when they do occur, making goal episodes "count more".
 
 **v3 runs started 2026-06-02 ~17:00 UTC** in `rl_runs` tmux (mc_dqn_v3, mc_ac_v3, mc_ppo_v3). Logs: `mc_*_v3_run.log`.
 

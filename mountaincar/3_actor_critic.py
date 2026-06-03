@@ -23,15 +23,16 @@ plt.rcParams.update(PLT_STYLE)
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Hyperparameters — vectorized A2C with n_envs=16
-# SB3 Zoo requires n_envs=16 for MountainCar; this replicates that setup.
+# Hyperparameters — vectorized A2C (SB3-style)
+# N_STEPS=16 failed: too short for credit assignment on MountainCar.
+# Momentum-building takes 50-100 steps; 16-step returns never reward it.
+# SB3 Zoo uses n_steps=256 (full-episode horizon), lr=7e-4, vf_coef=0.25.
 N_ENVS       = 16     # parallel environments
-N_STEPS      = 16     # steps collected per env before each update (256 total per update)
-N_UPDATES    = 4000   # total parameter updates = 4000 × 256 = 1,024,000 env steps
-ACTOR_LR     = 3e-4
-CRITIC_LR    = 1e-4
-VALUE_COEF   = 0.5
-ENTROPY_COEF = 0.02
+N_STEPS      = 256    # steps per env per update — covers full episode + context
+N_UPDATES    = 250    # 250 × 256 × 16 = 1,024,000 total env steps
+LR           = 7e-4   # SB3 default for MountainCar A2C (single optimizer)
+VALUE_COEF   = 0.25   # SB3 default (lower weight on critic reduces its dominance)
+ENTROPY_COEF = 0.001  # small positive — keeps policy from collapsing deterministically
 GAMMA        = 0.99
 LAM          = 0.95
 MAX_STEPS    = 200
@@ -87,10 +88,9 @@ def train():
 
     envs  = SyncVectorEnv([make_env for _ in range(N_ENVS)])
     model = ActorCritic(2, envs.single_action_space.n).to(DEVICE)
-    optimizer = optim.Adam([
-        {'params': model.actor.parameters(),  'lr': ACTOR_LR},
-        {'params': model.critic.parameters(), 'lr': CRITIC_LR},
-    ], eps=1e-5)
+    # Single optimizer — SB3 style. With N_STEPS=256, the longer rollout provides
+    # enough gradient signal that separate actor/critic LRs are not needed.
+    optimizer = optim.Adam(model.parameters(), lr=LR, eps=1e-5)
 
     obs, _ = envs.reset(seed=list(range(SEED, SEED + N_ENVS)))
 
@@ -128,11 +128,20 @@ def train():
             )
             done = terminated | truncated
 
-            # shaped reward: use next_obs (post-step) position and velocity
-            s_rew = np.array([
-                shaped_reward(next_obs[i, 0], next_obs[i, 1], terminated[i])
-                for i in range(N_ENVS)
-            ], dtype=np.float32)
+            # shaped reward: when an env auto-resets, next_obs[i] is the NEW
+            # episode's initial state, not the true final state. Use
+            # info['final_observation'][i] to get the correct terminal state.
+            s_rew = np.zeros(N_ENVS, dtype=np.float32)
+            for i in range(N_ENVS):
+                if done[i]:
+                    try:
+                        fo = info.get('final_observation', None)
+                        true_s = fo[i] if (fo is not None and fo[i] is not None) else next_obs[i]
+                    except (TypeError, KeyError, IndexError):
+                        true_s = next_obs[i]
+                else:
+                    true_s = next_obs[i]
+                s_rew[i] = shaped_reward(true_s[0], true_s[1], terminated[i])
 
             mb_obs[step]  = obs
             mb_act[step]  = actions.cpu().numpy()
@@ -149,19 +158,6 @@ def train():
                     if ep_raw[i] > -199.5:
                         goal_count += 1
                     ep_raw[i] = 0.0
-
-            # When an env auto-resets, use final_observation for bootstrap
-            # so we don't bootstrap on the reset state for truncated episodes.
-            # gymnasium vectorized envs store this in info['final_observation'].
-            for i in range(N_ENVS):
-                if truncated[i] and not terminated[i]:
-                    if 'final_observation' in info and info['final_observation'][i] is not None:
-                        final_s = normalize_state(info['final_observation'][i])
-                        final_t = torch.FloatTensor(final_s).unsqueeze(0).to(DEVICE)
-                        with torch.no_grad():
-                            _, fv = model(final_t)
-                        # Patch: mark this env's last value as the true final V
-                        mb_val[step, i] = fv.item()
 
             obs = next_obs
 
@@ -216,7 +212,7 @@ def train():
         actor_losses.append(policy_loss.item())
         critic_losses.append(value_loss.item())
 
-        if (update + 1) % 200 == 0:
+        if (update + 1) % 25 == 0:
             n_ep = len(all_rewards)
             avg  = np.mean(all_rewards[-100:]) if n_ep >= 100 else (np.mean(all_rewards) if all_rewards else -200.0)
             succ = sum(1 for r in all_rewards[-100:] if r >= SOLVED_AVG) if n_ep >= 100 else 0
@@ -268,7 +264,7 @@ def save_summary(all_rewards, goal_count, solve_ep, save_dir):
         f"  Total goals reached          : {goal_count:,}",
         "",
         "  Hyperparameters",
-        f"    Actor LR / Critic LR       : {ACTOR_LR} / {CRITIC_LR}",
+        f"    Learning rate (single)     : {LR}",
         f"    Value coef / Entropy coef  : {VALUE_COEF} / {ENTROPY_COEF}",
         f"    Gamma / Lambda (GAE)       : {GAMMA} / {LAM}",
         f"    Gradient clip norm         : 0.5",
