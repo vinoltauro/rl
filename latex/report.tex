@@ -273,18 +273,8 @@ The 50-fold difference in solution episode between PPO and Q-Learning ($195$ vs.
 
 \begin{figure}[H]
 \centering
-\begin{subfigure}[b]{0.55\linewidth}
-  \includegraphics[width=\linewidth]{figures/cartpole_all_algorithms.png}
-  \caption{Learning curves (moving average). Vertical dashed lines mark each algorithm's solution episode.}
-  \label{fig:cartpole_curves}
-\end{subfigure}
-\hfill
-\begin{subfigure}[b]{0.42\linewidth}
-  \includegraphics[width=\linewidth]{figures/cartpole_sample_efficiency.png}
-  \caption{Episodes to solve (log scale). PPO is 50$\times$ faster than Q-Learning.}
-  \label{fig:cartpole_bar}
-\end{subfigure}
-\caption{CartPole-v1: All four algorithms. PPO solves fastest (ep.\ 195) by reusing each collected batch across 10 epochs. Q-Learning is limited by state aliasing from its coarse discretisation.}
+\includegraphics[width=\linewidth]{figures/fig_cartpole.png}
+\caption{CartPole-v1: all four algorithms. (a)~Learning curves with moving averages; vertical dashed lines mark each algorithm's solution episode. (b)~Episodes to solve on a log scale. PPO solves 50$\times$ faster than Q-Learning by reusing each trajectory batch across 10 epochs.}
 \label{fig:cartpole}
 \end{figure}
 
@@ -316,8 +306,8 @@ PPO (v5)   & 8,000 ep  & $-162.8 \pm 36.9$ & $\mathbf{-151.8 \pm 29.4}$ & $-148$
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.8\linewidth]{figures/mountaincar_comparison.png}
-\caption{MountainCar-v0: best result per algorithm (first 10,000 episodes). Q-Learning uses raw rewards; DQN and PPO use shaped rewards. The $-110$ solved threshold (dotted line) is not reached by any algorithm. DQN achieves the best stable mean ($-146.7$); PPO achieves the most goal discoveries (4,816).}
+\includegraphics[width=\linewidth]{figures/fig_mountaincar.png}
+\caption{MountainCar-v0: best result per algorithm over the first 10,000 episodes. Q-Learning uses raw rewards; DQN and PPO use shaped rewards. The dotted line marks the solved threshold ($-110$). No algorithm reaches this threshold. Double DQN achieves the best stable mean ($-146.7$); PPO achieves the most goal discoveries (4,816) with no late-stage regression.}
 \label{fig:mountaincar_comparison}
 \end{figure}
 
@@ -326,18 +316,8 @@ PPO (v5)   & 8,000 ep  & $-162.8 \pm 36.9$ & $\mathbf{-151.8 \pm 29.4}$ & $-148$
 
 \begin{figure}[H]
 \centering
-\begin{subfigure}[b]{0.48\linewidth}
-  \includegraphics[width=\linewidth]{figures/ppo_trajectory.png}
-  \caption{PPO v5 best policy. The agent builds momentum through repeated oscillation before crossing the goal at $x=0.5$.}
-  \label{fig:ppo_traj}
-\end{subfigure}
-\hfill
-\begin{subfigure}[b]{0.48\linewidth}
-  \includegraphics[width=\linewidth]{figures/dqn_trajectory.png}
-  \caption{Double DQN v3 best policy. Similar momentum-building pattern, reaching the goal position in the test episode.}
-  \label{fig:dqn_traj}
-\end{subfigure}
-\caption{MountainCar-v0 test episode trajectories for the two best-performing algorithms. Both learn the counter-intuitive strategy of first driving left to build kinetic energy before ascending to the goal.}
+\includegraphics[width=\linewidth]{figures/fig_trajectories.png}
+\caption{MountainCar-v0 greedy-policy test trajectories. Both algorithms learn the counter-intuitive momentum-building strategy: the car first reverses left to accumulate kinetic energy, then uses that energy to climb to the goal. (a)~PPO v5 trajectory (position and velocity vs timestep). (b)~Double DQN v3 trajectory.}
 \label{fig:trajectories}
 \end{figure}
 
@@ -379,8 +359,8 @@ Three issues combining to cause Q-value runaway in successive DQN runs:
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.9\linewidth]{figures/dqn_overestimation.png}
-\caption{Q-value overestimation in standard vs.\ Double DQN. \textit{Left}: Huber loss on symlog scale, where standard DQN loss diverges to 2,491 and Double DQN stabilises at $\sim$700. \textit{Right}: corresponding performance, where standard DQN plateaus at $-134$ and Double DQN achieves $-146.7$ without runaway.}
+\includegraphics[width=\linewidth]{figures/fig_dqn_overestimation.png}
+\caption{Q-value overestimation: standard DQN vs.\ Double DQN on MountainCar-v0. (a)~Training loss on a symlog scale; standard DQN loss diverges to 2,491 while Double DQN stabilises near 700. (b)~Corresponding reward curves; standard DQN plateaus at $-134$ and Double DQN achieves $-146.7$ without runaway.}
 \label{fig:dqn_overestimation}
 \end{figure}
 
@@ -416,8 +396,8 @@ The actor loss CSV confirms this: mean actor loss reaches $0.000023$ by episode 
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.9\linewidth]{figures/ac_structural_failure.png}
-\caption{A2C structural failure on MountainCar. \textit{Left}: v3 (all issues resolved) vs.\ run 4 (outer product error, random exploration only). Both hover at $-200$, confirming the failure is structural. \textit{Right}: A2C v3 actor and critic loss on log scale. The critic converges by episode 600 and the actor loss drops to zero, remaining there for 4,400 episodes.}
+\includegraphics[width=\linewidth]{figures/fig_ac_failure.png}
+\caption{A2C structural failure on MountainCar-v0. (a)~Mean reward remains at $-200$ throughout all 5,000 episodes despite all implementation issues being resolved. (b)~Actor and critic loss on a log scale. The critic converges by episode~600, after which the actor loss drops to zero and remains there for the remaining 4,400 episodes, confirming the zero-advantage fixed point.}
 \label{fig:ac_failure}
 \end{figure}
 
@@ -437,19 +417,16 @@ This result provides direct empirical support for the theoretical warning of Ng 
 
 \begin{figure}[H]
 \centering
-\begin{subfigure}[b]{0.55\linewidth}
-  \includegraphics[width=\linewidth]{figures/ppo_comparison.png}
-  \caption{PPO v2 (fixed LR, no implementation fixes) vs.\ v5 (LR floor + all fixes). v2 reaches avg $-153$ then catastrophically regresses at ep 5,300. v5 maintains consistent goal discovery throughout 8,000 episodes.}
-  \label{fig:ppo_comparison}
-\end{subfigure}
-\hfill
-\begin{subfigure}[b]{0.42\linewidth}
-  \includegraphics[width=\linewidth]{figures/ppo_entropy_comparison.png}
-  \caption{Entropy collapse in v3 (LR$\to$0) vs.\ healthy entropy in v5 (LR floor). v3 final entropy: 0.003 (near-deterministic); v5 maintains $\sim$0.15 throughout.}
-  \label{fig:ppo_entropy}
-\end{subfigure}
-\caption{PPO implementation fixes. Left: effect on average reward and goal discovery. Right: entropy collapse from LR$\to$0 (Issue \#39) vs.\ stable entropy with LR floor.}
-\label{fig:ppo_fixes}
+\includegraphics[width=\linewidth]{figures/fig_ppo_improvements.png}
+\caption{Effect of the learning rate schedule fix on PPO. (a)~Mean reward trajectories for v2 (fixed LR) and v5 (LR floor). v2 stabilises at $-153$ over episodes 3,000--5,000 then catastrophically regresses at episode 5,300; v5 maintains consistent improvement throughout 8,000 episodes. (b)~Goals reached per 1,000-episode window. v2 peaks in window 3K--4K then collapses to zero; v5 maintains steady goal discovery.}
+\label{fig:ppo_improvements}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_ppo_entropy.png}
+\caption{PPO policy entropy under two learning rate schedules. (a)~v3 with LR$\to$0: entropy collapses from 0.15 to 0.003 (near-deterministic policy) as the learning rate approaches zero, leaving only 26 goals discovered in 8,000 episodes. (b)~v5 with LR floor at $5\times10^{-5}$: entropy remains stable at $\sim$0.15 throughout, sustaining exploration and enabling 4,816 goal discoveries.}
+\label{fig:ppo_entropy}
 \end{figure}
 
 \textbf{Issue \#44 (Extending budget past optimal stopping point)}: Running DQN to 8,000 episodes (v5) after the optimal result at 5,000 (v3) allowed Q-value overestimation to compound further: loss 696 (ep 5K) $\rightarrow$ 1,308 (ep 8K); mean reward $-146.7$ (ep 5K) $\rightarrow$ $-182.4$ (ep 8K). Similarly, PPO at 12,000 episodes (v6) found 6,764 goals but the extended fine-tuning phase at floor LR eroded the policy. In hard-exploration environments with reward-shaping-driven Q-value growth, more training is not monotonically beneficial. Fix: report v3 DQN (5K eps) and v5 PPO (8K eps) as the definitive results.
