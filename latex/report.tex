@@ -285,20 +285,20 @@ No algorithm solves MountainCar-v0 (threshold: mean $\geq -110$) within the eval
 \textbf{Algorithm} & \textbf{Budget} & \textbf{Mean (all)} & \textbf{Mean (last 100)} & \textbf{Best avg} & \textbf{Goals} \\
 \midrule
 Q-Learning & 50,000 ep & $-152.6 \pm 25.8$ & $-137.8 \pm 7.3$ & $-130.1$ & Partial \\
-Double DQN & 5,000 ep  & $-174.7 \pm 23.5$ & $-146.7 \pm 6.3$ & $\sim -143$ & Yes \\
-A2C        & 5,000 ep  & $-200.0 \pm 0.0$  & $-200.0 \pm 0.0$ & $-200.0$   & \textbf{Zero} \\
-PPO        & 8,000 ep  & $-162.8 \pm 36.9$ & $-151.8 \pm 29.4$ & $\sim -148$ & 4,816 \\
+Double DQN & 5,000 ep  & $-174.7 \pm 23.5$ & $\mathbf{-146.7 \pm 6.3}$ & $-143$ & Yes \\
+A2C        & 5,000 ep  & $-200.0 \pm 0.0$  & $-200.0 \pm 0.0$ & $-200.0$ & \textbf{Zero} \\
+PPO (v5)   & 8,000 ep  & $-162.8 \pm 36.9$ & $\mathbf{-151.8 \pm 29.4}$ & $-148$ & 4,816 \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
 \textbf{Q-Learning} achieves a best 100-episode average of $-130.1$ before plateauing, representing the tabular limit for a $40\times40$ discretisation on this environment. Raw rewards are used (see Section~\ref{sec:shaping_bugs}).
 
-\textbf{Double DQN} achieves a stable last-100 average of $-146.7 \pm 6.3$ at episode 5,000---the most stable DQN result after multiple ablation rounds. The agent consistently reaches the goal in approximately 147 steps on average, but cannot close the gap to the 110-step threshold.
+\textbf{Double DQN} achieves a stable last-100 average of $-146.7 \pm 6.3$ at episode 5,000 (v3)---the best DQN result after multiple ablation rounds. Extending to 8,000 episodes (v5) caused further Q-value overestimation: loss grew from 696 to 1,308 and performance regressed to $-182.4$ at episode 8,000. The 5,000-episode configuration is the optimal stopping point for this algorithm and reward scale.
 
 \textbf{A2C} produces zero goals in 5,000 episodes and maintains $-200.0$ mean reward throughout. This is a structural failure caused by the zero-advantage fixed point (Section~\ref{sec:ac_structural}), not an implementation error. Single-environment A2C cannot provide the trajectory diversity required to generate non-zero advantages in a hard-exploration environment. The actor loss converges to exactly $0$ by episode 600 and remains there.
 
-\textbf{PPO} (v5) is the best result: $-151.8 \pm 29.4$ at episode 8,000 with 4,816 goal discoveries and no late-stage regression. The LR schedule (decaying from $3\times10^{-4}$ to a floor of $5\times10^{-5}$) prevents the catastrophic policy destruction observed in earlier runs where LR decayed to zero. PPO discovers goals in dense bursts from episode ~1,000 onwards and maintains consistent goal-reaching throughout the 8,000-episode run.
+\textbf{PPO} (v5) achieves the best result: $-151.8 \pm 29.4$ at episode 8,000 with 4,816 goal discoveries and no late-stage regression. The LR schedule (decaying from $3\times10^{-4}$ to a floor of $5\times10^{-5}$ over a fixed 8,000-step window) prevents the catastrophic policy destruction observed in earlier runs. PPO discovers goals in dense bursts from episode $\sim$1,000 onwards and maintains $\sim$650 goals per 1,000-episode window throughout the run. Extending to 12,000 episodes (v6) replicated the first 8,000 episodes (6,764 total goals) but the additional fine-tuning phase at floor LR eroded rather than consolidated the policy: goal discovery dropped from 752/window to 176/window then zero, ending at $-200$ last-100 average. The 8,000-episode configuration is optimal.
 
 \subsubsection{Benchmark Contextualisation}
 
@@ -379,6 +379,8 @@ This result provides direct empirical support for the theoretical warning of Ng 
 \textbf{Bug \#39}: Decaying learning rate to exactly zero caused entropy collapse. With LR $\rightarrow 0$, even the entropy bonus gradient update becomes negligible. The policy converges deterministically. Final entropy: $0.0032$ (vs.\ $0.154$ in working runs). Only 26 goals discovered in 8,000 episodes. Fix: LR floor at $5\times10^{-5}$.
 
 \textbf{Bug \#41 (Value clipping backfire)}: Value function clipping with $\varepsilon_V=0.1$ limited the value network to update by at most $\varepsilon_V \cdot n_{\text{epochs}} = 1.0$ per update cycle. With goal episode returns of $\sim+50$ and $V(s) \approx -8$, the advantage for goal states was $\sim58$, causing the policy probability ratio to always saturate at $1 + \varepsilon = 1.2$. The effective policy gradient toward goal behavior was $\log(1.2) \approx 0.18$ per epoch. The constant entropy gradient ($0.01 \times \nabla\mathcal{H}$) exceeded this, slowly eroding goal behavior between discoveries. Result: cyclic bursts (78 goals in episodes 2000--2500) followed by 1,500-episode droughts with zero goals. Total: 26 goals versus 3,363 in the configuration without value clipping. The fix: remove value clipping entirely. The LR floor already prevents value overfit by reducing update magnitude late in training.
+
+\textbf{Bug \#44 (Extending budget past optimal stopping point)}: Running DQN to 8,000 episodes (v5) after the optimal result at 5,000 (v3) allowed Q-value overestimation to compound further: loss 696 (ep 5K) $\rightarrow$ 1,308 (ep 8K); mean reward $-146.7$ (ep 5K) $\rightarrow$ $-182.4$ (ep 8K). Similarly, PPO at 12,000 episodes (v6) found 6,764 goals but the extended fine-tuning phase at floor LR eroded the policy. In hard-exploration environments with reward-shaping-driven Q-value growth, more training is not monotonically beneficial. Fix: report v3 DQN (5K eps) and v5 PPO (8K eps) as the definitive results.
 
 \textbf{Bug \#43 (LR-N\_EPISODES coupling)}: The learning rate formula \texttt{lr = LR\_MIN + (LR - LR\_MIN)*(1 - ep/N\_EPISODES)} couples the LR at every episode to the total episode count. Changing \texttt{N\_EPISODES} from 8,000 (v5) to 12,000 (v6) produced a LR difference of $\sim1\times10^{-5}$ per episode. Via the butterfly effect, this caused completely divergent training trajectories: v5 found goals from episode 416 with 589 goals per 1,000-episode window; v6 found goals at episode 811 and cycled with 78 goals in the best 500-episode window. This is a direct empirical reproduction of Henderson et al.\ \cite{henderson2018deep}: ``small hyperparameter changes produce outcome differences larger than the reported improvements.'' Fix: \texttt{LR\_DECAY\_STEPS=8000} (constant), decoupled from \texttt{N\_EPISODES}.
 
