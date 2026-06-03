@@ -1,0 +1,67 @@
+MountainCar A2C (vectorized n_envs=16) | Device: cuda
+Total env steps: 1,024,000
+=======================================================
+Update   25 | Steps:  102,400 | Episodes:   496 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update   50 | Steps:  204,800 | Episodes: 1,008 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update   75 | Steps:  307,200 | Episodes: 1,520 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update  100 | Steps:  409,600 | Episodes: 2,032 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update  125 | Steps:  512,000 | Episodes: 2,544 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update  150 | Steps:  614,400 | Episodes: 3,056 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update  175 | Steps:  716,800 | Episodes: 3,552 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update  200 | Steps:  819,200 | Episodes: 4,064 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update  225 | Steps:  921,600 | Episodes: 4,576 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update  250 | Steps: 1,024,000 | Episodes: 5,088 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Saved: results/mountaincar_ac_20260603_075359/training_log.csv
+
+=======================================================
+TRAINING SUMMARY — MountainCar A2C (vectorized)
+=======================================================
+  N_ENVS / N_STEPS            : 16 / 256
+  Total env steps              : 1,024,000
+  Total episodes (all envs)    : 5,088
+  Solved at episode            : Not solved
+  Mean reward (all)            : -200.00 ± 0.00
+  Mean reward (last 100)       : -200.00 ± 0.00
+  Success rate (last 100)      : 0 / 100  (0.0%)
+  Total goals reached          : 0
+
+  Hyperparameters
+    Learning rate (single)     : 0.0007
+    Value coef / Entropy coef  : 0.25 / 0.001
+    Gamma / Lambda (GAE)       : 0.99 / 0.95
+    Gradient clip norm         : 0.5
+    Network hidden             : 64 units, 2 layers (Tanh)
+    Initialisation             : orthogonal
+    State normalisation        : pos [-1,1], vel [-1,1]
+    Reward shaping             : height + 100·KE - 1  (+10 at goal)
+=======================================================
+Saved: results/mountaincar_ac_20260603_075359/training_results.png
+Saved: results/mountaincar_ac_20260603_075359/trajectory.png
+
+Testing trained agent (20 episodes)...
+  ✗ Test  1: -200.0
+  ✗ Test  2: -200.0
+  ✗ Test  3: -200.0
+  ✗ Test  4: -200.0
+  ✗ Test  5: -200.0
+  ✗ Test  6: -200.0
+  ✗ Test  7: -200.0
+  ✗ Test  8: -200.0
+  ✗ Test  9: -200.0
+  ✗ Test 10: -200.0
+  ✗ Test 11: -200.0
+  ✗ Test 12: -200.0
+  ✗ Test 13: -200.0
+  ✗ Test 14: -200.0
+  ✗ Test 15: -200.0
+  ✗ Test 16: -200.0
+  ✗ Test 17: -200.0
+  ✗ Test 18: -200.0
+  ✗ Test 19: -200.0
+  ✗ Test 20: -200.0
+
+  Average : -200.00 ± 0.00
+  Success : 0/20  (0%)
+  Result  : Not solved
+
+Results saved to: results/mountaincar_ac_20260603_075359/

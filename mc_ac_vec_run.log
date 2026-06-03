@@ -1,0 +1,77 @@
+MountainCar A2C (vectorized n_envs=16) | Device: cuda
+Total env steps: 1,024,000
+=======================================================
+Update  200 | Steps:   51,200 | Episodes:   240 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update  400 | Steps:  102,400 | Episodes:   496 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update  600 | Steps:  153,600 | Episodes:   752 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update  800 | Steps:  204,800 | Episodes: 1,008 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update 1000 | Steps:  256,000 | Episodes: 1,264 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update 1200 | Steps:  307,200 | Episodes: 1,520 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update 1400 | Steps:  358,400 | Episodes: 1,776 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update 1600 | Steps:  409,600 | Episodes: 2,032 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update 1800 | Steps:  460,800 | Episodes: 2,288 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update 2000 | Steps:  512,000 | Episodes: 2,544 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update 2200 | Steps:  563,200 | Episodes: 2,800 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update 2400 | Steps:  614,400 | Episodes: 3,056 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update 2600 | Steps:  665,600 | Episodes: 3,296 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update 2800 | Steps:  716,800 | Episodes: 3,552 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update 3000 | Steps:  768,000 | Episodes: 3,808 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update 3200 | Steps:  819,200 | Episodes: 4,064 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update 3400 | Steps:  870,400 | Episodes: 4,320 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update 3600 | Steps:  921,600 | Episodes: 4,576 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update 3800 | Steps:  972,800 | Episodes: 4,832 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Update 4000 | Steps: 1,024,000 | Episodes: 5,088 | Avg(100): -200.00 | Goals:    0 | Solved: 0/100
+Saved: results/mountaincar_ac_20260603_074708/training_log.csv
+
+=======================================================
+TRAINING SUMMARY — MountainCar A2C (vectorized)
+=======================================================
+  N_ENVS / N_STEPS            : 16 / 16
+  Total env steps              : 1,024,000
+  Total episodes (all envs)    : 5,088
+  Solved at episode            : Not solved
+  Mean reward (all)            : -200.00 ± 0.00
+  Mean reward (last 100)       : -200.00 ± 0.00
+  Success rate (last 100)      : 0 / 100  (0.0%)
+  Total goals reached          : 0
+
+  Hyperparameters
+    Actor LR / Critic LR       : 0.0003 / 0.0001
+    Value coef / Entropy coef  : 0.5 / 0.02
+    Gamma / Lambda (GAE)       : 0.99 / 0.95
+    Gradient clip norm         : 0.5
+    Network hidden             : 64 units, 2 layers (Tanh)
+    Initialisation             : orthogonal
+    State normalisation        : pos [-1,1], vel [-1,1]
+    Reward shaping             : height + 100·KE - 1  (+10 at goal)
+=======================================================
+Saved: results/mountaincar_ac_20260603_074708/training_results.png
+Saved: results/mountaincar_ac_20260603_074708/trajectory.png
+
+Testing trained agent (20 episodes)...
+  ✗ Test  1: -200.0
+  ✗ Test  2: -200.0
+  ✗ Test  3: -200.0
+  ✗ Test  4: -200.0
+  ✗ Test  5: -200.0
+  ✗ Test  6: -200.0
+  ✗ Test  7: -200.0
+  ✗ Test  8: -200.0
+  ✗ Test  9: -200.0
+  ✗ Test 10: -200.0
+  ✗ Test 11: -200.0
+  ✗ Test 12: -200.0
+  ✗ Test 13: -200.0
+  ✗ Test 14: -200.0
+  ✗ Test 15: -200.0
+  ✗ Test 16: -200.0
+  ✗ Test 17: -200.0
+  ✗ Test 18: -200.0
+  ✗ Test 19: -200.0
+  ✗ Test 20: -200.0
+
+  Average : -200.00 ± 0.00
+  Success : 0/20  (0%)
+  Result  : Not solved
+
+Results saved to: results/mountaincar_ac_20260603_074708/

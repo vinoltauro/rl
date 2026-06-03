@@ -1,0 +1,33 @@
+MountainCar Actor-Critic (batch=8) | Device: cuda
+=======================================================
+Episode  100 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode  200 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode  300 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode  400 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode  500 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode  600 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode  700 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode  800 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode  900 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 1000 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 1100 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 1200 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 1300 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 1400 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 1500 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 1600 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 1700 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 1800 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 1900 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 2000 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 2100 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 2200 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 2300 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 2400 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 2500 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 2600 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 2700 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 2800 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 2900 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 3000 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
+Episode 3100 | Avg raw(100): -200.00 | Success:   0/100 | Steps: 200
