@@ -67,11 +67,6 @@ of Increasing Complexity
 
 \vspace{1.5cm}
 
-{\large\bfseries
-A Report Submitted in Partial Fulfilment of the Requirements\\
-for the Degree of Master of Science in Computer Science
-\par}
-
 \vspace{2cm}
 
 {\large
@@ -231,37 +226,48 @@ All deep RL algorithms use fully-connected networks with orthogonal weight initi
 
 \begin{figure}[H]
 \centering
+\resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[
-  blk/.style={draw, rectangle, rounded corners=3pt, minimum width=1.55cm,
-              minimum height=0.68cm, font=\small, fill=tcdBlue!8, align=center},
-  head/.style={blk, minimum width=1.4cm},
-  ann/.style={font=\footnotesize, align=center},
-  >=Stealth, thick
+  blk/.style={draw, rectangle, rounded corners=4pt,
+              minimum width=2.0cm, minimum height=0.9cm,
+              font=\normalsize, fill=tcdBlue!10, align=center, inner sep=5pt},
+  inp/.style={blk, fill=tcdBlue!22},
+  outblk/.style={blk, fill=orange!22},
+  actor/.style={blk, minimum width=1.9cm, fill=green!20},
+  critic/.style={blk, minimum width=1.9cm, fill=red!14},
+  lann/.style={font=\small, align=center},
+  >=Stealth, line width=1.2pt
 ]
-%% ── DQN ─────────────────────────────────────────────────────
-\node[blk, fill=tcdBlue!18] (d0) at (0,   0) {Input\\$n_\text{obs}$};
-\node[blk]                  (d1) at (2.1, 0) {FC 128\\ReLU};
-\node[blk]                  (d2) at (4.2, 0) {FC 128\\ReLU};
-\node[blk, fill=orange!20]  (d3) at (6.3, 0) {FC $|A|$};
+%% ── (a) DQN ─────────────────────────────────────────────────
+\node[inp]  (d0) at (0.0, 0) {Input\\$n_\text{obs}$};
+\node[blk]  (d1) at (2.8, 0) {FC 128\\ReLU};
+\node[blk]  (d2) at (5.6, 0) {FC 128\\ReLU};
+\node[outblk] (d3) at (8.4, 0) {FC $|A|$};
 \draw[->] (d0)--(d1); \draw[->] (d1)--(d2); \draw[->] (d2)--(d3);
-\node[ann, above=0.12cm of d0] {State $s$};
-\node[ann, above=0.12cm of d3] {$Q(s,a)$};
-\node[font=\small\bfseries, below=0.18cm of d2] {(a)\enspace DQN};
+\node[lann, above=0.25cm of d0] {State $s$};
+\node[lann, above=0.25cm of d3] {$Q(s,a)$};
+\node[lann, below=0.35cm of d1, font=\small\bfseries] {\textbf{(a)}\enspace DQN};
 
-%% ── Actor-Critic ──────────────────────────────────────────────
-\node[blk, fill=tcdBlue!18] (a0) at (0,   -2.6) {Input\\$n_\text{obs}$};
-\node[blk]                  (a1) at (2.1, -2.6) {FC 64\\Tanh};
-\node[blk]                  (a2) at (4.2, -2.6) {FC 64\\Tanh};
-\node[head, fill=green!18]  (aa) at (6.3, -1.9) {FC $|A|$\\Softmax};
-\node[head, fill=red!12]    (ac) at (6.3, -3.3) {FC 1};
+%% separator
+\draw[densely dotted, gray!60, line width=0.8pt] (-0.5, -1.4) -- (10.0, -1.4);
+
+%% ── (b) Actor-Critic ─────────────────────────────────────────
+\node[inp]    (a0) at (0.0, -3.5) {Input\\$n_\text{obs}$};
+\node[blk]    (a1) at (2.8, -3.5) {FC 64\\Tanh};
+\node[blk]    (a2) at (5.6, -3.5) {FC 64\\Tanh};
+\node[actor]  (aa) at (8.8, -2.6) {FC $|A|$\\Softmax};
+\node[critic] (ac) at (8.8, -4.4) {FC 1};
 \draw[->] (a0)--(a1); \draw[->] (a1)--(a2);
-\draw[->] (a2.east) -- ++(0.4,0) |- (aa.west);
-\draw[->] (a2.east) -- ++(0.4,0) |- (ac.west);
-\node[ann, above=0.1cm of aa] {$\pi(a|s)$ (Actor)};
-\node[ann, below=0.1cm of ac] {$V(s)$ (Critic)};
-\node[font=\small\bfseries, below=0.18cm of a1] {(b)\enspace A2C / PPO Actor-Critic};
-\end{tikzpicture}
-\caption{Network architectures used in this study. (a)~DQN: two hidden layers of 128 units with ReLU activations mapping the state to per-action Q-values. For CartPole the output has 2 units; for MountainCar, 3. (b)~A2C/PPO: two shared hidden layers of 64 units with Tanh activations, branching into a softmax policy head (actor) and a scalar value head (critic). All weights use orthogonal initialisation with gain $\sqrt{2}$.}
+%% fork
+\draw[->] (a2.east) -- ++(0.65,0) |- (aa.west);
+\draw[->] (a2.east) -- ++(0.65,0) |- (ac.west);
+\node[lann, above=0.25cm of a0] {State $s$};
+\node[lann, above=0.18cm of aa] {$\pi(a|s)$ \small(Actor)};
+\node[lann, below=0.18cm of ac] {$V(s)$ \small(Critic)};
+\node[lann, below=0.35cm of a1, font=\small\bfseries]
+  {\textbf{(b)}\enspace A2C / PPO Actor-Critic};
+\end{tikzpicture}}
+\caption{Network architectures. (a)~DQN: two hidden layers of 128 units with ReLU activations mapping the state to per-action Q-values (2 units for CartPole, 3 for MountainCar). (b)~A2C/PPO actor-critic: two hidden layers of 64 units with Tanh activations, branching into a softmax policy head (actor) and a scalar value head (critic). All weights use orthogonal initialisation.}
 \label{fig:arch}
 \end{figure}
 
@@ -346,42 +352,52 @@ A key architectural distinction between the algorithms is how they collect and r
 
 \begin{figure}[H]
 \centering
+\resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[
-  box/.style={draw, rounded corners=3pt, fill=tcdBlue!8, minimum height=0.65cm,
-              font=\small, align=center, inner sep=4pt},
-  buf/.style={box, fill=orange!15, minimum width=2.2cm},
-  arr/.style={->, >=Stealth, thick},
-  lab/.style={font=\small\bfseries}
+  bx/.style={draw, rectangle, rounded corners=4pt,
+             minimum width=3.0cm, minimum height=0.85cm,
+             font=\normalsize, fill=tcdBlue!10, align=center, inner sep=5pt},
+  buf/.style={bx, fill=orange!20},
+  rdbx/.style={bx, fill=red!14},
+  grn/.style={bx, fill=green!18},
+  hdr/.style={font=\normalsize\bfseries, align=center},
+  arr/.style={->, >=Stealth, line width=1.2pt},
+  darr/.style={->, >=Stealth, line width=1.2pt, dashed},
+  lbl/.style={font=\small, fill=white, inner sep=2pt}
 ]
-%% DQN column
-\node[lab]         at (1.4, 0.5)  {DQN};
-\node[box]         (de) at (1.4, 0)   {Environment};
-\node[buf]         (db) at (1.4,-1.2) {Replay Buffer\\50K transitions};
-\node[box]         (dn) at (1.4,-2.4) {Online Net $\theta$};
-\node[box]         (dt) at (1.4,-3.6) {Target Net $\theta^-$};
-\draw[arr] (de.south) -- (db.north) node[midway,right,font=\footnotesize]{store $(s,a,r,s')$};
-\draw[arr] (db.south) -- (dn.north) node[midway,right,font=\footnotesize]{sample batch};
-\draw[arr,dashed] (dn.south) -- (dt.north) node[midway,right,font=\footnotesize]{copy every 500 steps};
+%% ── Column 1: DQN (x = 0) ────────────────────────────────────────
+\node[hdr]   at (0,  1.0) {DQN};
+\node[bx]    (de) at (0,  0.0)  {Environment};
+\node[buf]   (db) at (0, -1.6)  {Replay Buffer\\50\,K transitions};
+\node[bx]    (dn) at (0, -3.2)  {Online Net $\theta$};
+\node[bx]    (dt) at (0, -4.8)  {Target Net $\theta^{-}$};
+\draw[arr]  (de)--(db) node[lbl,midway,right]{store $(s,a,r,s')$};
+\draw[arr]  (db)--(dn) node[lbl,midway,right]{sample batch};
+\draw[darr] (dn)--(dt) node[lbl,midway,right]{copy every 500 steps};
 
-%% A2C column
-\node[lab]         at (5.0, 0.5)  {A2C (single env)};
-\node[box]         (ae) at (5.0, 0)   {Environment};
-\node[box]         (ar) at (5.0,-1.2) {Episode rollout};
-\node[box]         (au) at (5.0,-2.4) {GAE advantages};
-\node[box, fill=red!12] (ag) at (5.0,-3.6) {1 gradient update};
+%% ── Column 2: A2C (x = 5.5) ─────────────────────────────────────
+\node[hdr]   at (5.5,  1.0) {A2C  (single env)};
+\node[bx]    (ae) at (5.5,  0.0)  {Environment};
+\node[bx]    (ar) at (5.5, -1.6)  {Episode rollout};
+\node[bx]    (au) at (5.5, -3.2)  {GAE advantages};
+\node[rdbx]  (ag) at (5.5, -4.8)  {1 gradient update};
 \draw[arr] (ae)--(ar); \draw[arr] (ar)--(au); \draw[arr] (au)--(ag);
-\draw[arr, dashed, bend left=45] (ag.east) to node[right,font=\footnotesize]{discard} (ae.east);
+%% return arrow: right side, well clear of nodes
+\draw[darr] (ag.east) -- ++(1.2,0) -- ++(0,4.8) -- (ae.east)
+            node[lbl, pos=0.5, xshift=4pt]{discard data};
 
-%% PPO column
-\node[lab]         at (8.8, 0.5)  {PPO};
-\node[box]         (pe) at (8.8, 0)   {Environment};
-\node[box]         (pb) at (8.8,-1.2) {1,024-step buffer};
-\node[box]         (pa) at (8.8,-2.4) {GAE advantages};
-\node[box, fill=green!15] (pg) at (8.8,-3.6) {10 epochs $\times$\\minibatches};
+%% ── Column 3: PPO (x = 11.0) ─────────────────────────────────────
+\node[hdr]   at (11.0,  1.0) {PPO};
+\node[bx]    (pe) at (11.0,  0.0)  {Environment};
+\node[bx]    (pb) at (11.0, -1.6)  {1,024-step buffer};
+\node[bx]    (pa) at (11.0, -3.2)  {GAE advantages};
+\node[grn]   (pg) at (11.0, -4.8)  {10 epochs\,$\times$\,minibatches};
 \draw[arr] (pe)--(pb); \draw[arr] (pb)--(pa); \draw[arr] (pa)--(pg);
-\draw[arr, dashed, bend right=45] (pg.west) to node[left,font=\footnotesize]{reuse} (pb.west);
-\end{tikzpicture}
-\caption{Data collection and update strategies. DQN (left) stores all transitions in a large replay buffer and samples randomly, enabling indefinite data reuse but requiring a separate target network for stability. A2C (centre) collects one episode, computes advantages, applies one gradient update, then discards the data. PPO (right) collects 1,024 steps, then reuses the same batch across 10 epochs of minibatch updates before discarding. PPO's multi-epoch reuse is why rare goal transitions have disproportionate influence compared to A2C.}
+%% return arrow: left side, well clear of nodes
+\draw[darr] (pg.west) -- ++(-1.2,0) -- ++(0,3.2) -- (pb.west)
+            node[lbl, pos=0.5, xshift=-4pt]{reuse data};
+\end{tikzpicture}}
+\caption{Data collection and update strategies for the three deep RL algorithms. \textbf{DQN} (left) stores every transition in a 50K replay buffer and samples random minibatches, enabling data reuse at the cost of off-policy divergence risk. \textbf{A2C} (centre) collects one episode, makes one gradient update, then discards the data. \textbf{PPO} (right) collects 1,024 steps and reuses that same batch across 10 epochs of minibatch updates before discarding. PPO's multi-epoch reuse amplifies rare goal transitions, which is why it discovers goals on MountainCar while A2C does not.}
 \label{fig:rollout}
 \end{figure}
 
@@ -555,21 +571,30 @@ Even after correcting all 14 issues affecting A2C, the algorithm fails completel
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[
-  box/.style={draw, rectangle, rounded corners=5pt, fill=tcdBlue!7,
-              minimum width=7.5cm, minimum height=0.75cm, align=center, font=\small},
-  arr/.style={->, >=Stealth, thick},
-  lbl/.style={font=\footnotesize, midway, right=2pt}
+  bx/.style={draw, rectangle, rounded corners=5pt,
+             minimum width=8.5cm, minimum height=1.0cm,
+             align=center, font=\small, inner sep=6pt},
+  arr/.style={->, >=Stealth, line width=1.2pt},
+  lbl/.style={font=\footnotesize, fill=white, inner sep=2pt}
 ]
-\node[box]                   (p)  at (0,  0)   {Policy $\pi_\theta$ near-uniform at initialisation};
-\node[box, fill=orange!12]   (c)  at (0, -1.7) {Critic fits $V_\pi(s)$ accurately (by episode $\sim\!600$)};
-\node[box, fill=red!10]      (a)  at (0, -3.4) {$\hat{A}(s,a) = Q(s,a) - V_\pi(s) \approx 0$ for all transitions};
-\node[box, fill=gray!12]     (g)  at (0, -5.1) {$\nabla_\theta \mathcal{L}_\text{actor} \approx 0$\quad (policy gradient vanishes)};
-\draw[arr] (p.south)  -- (c.north)  node[lbl]{collect rollouts};
-\draw[arr] (c.south)  -- (a.north)  node[lbl]{compute GAE advantages};
-\draw[arr] (a.south)  -- (g.north)  node[lbl]{normalise};
-\draw[arr] (g.east) -- ++(1.4,0) -- ++(0, 5.1) -- (p.east) node[lbl, right=4pt]{no policy update};
+%% Four boxes, centre-aligned at x=0, separated by 2.0cm
+\node[bx, fill=tcdBlue!12]  (p) at (0,  0.0) {Policy $\pi_\theta$ initialised near-uniform};
+\node[bx, fill=orange!14]   (c) at (0, -2.2) {Critic fits $V_\pi(s)$ accurately by episode ${\sim}600$};
+\node[bx, fill=red!12]      (a) at (0, -4.4) {$\hat{A}(s,a)=Q(s,a)-V_\pi(s)\approx 0$ for all transitions};
+\node[bx, fill=gray!14]     (g) at (0, -6.6) {$\nabla_{\!\theta}\,\mathcal{L}_{\text{actor}}\approx 0$ \quad policy gradient vanishes};
+%% Downward arrows (right side of centre-line)
+\draw[arr] (p.south) -- (c.north)
+           node[lbl, midway, right=6pt]{collect rollouts};
+\draw[arr] (c.south) -- (a.north)
+           node[lbl, midway, right=6pt]{compute GAE advantages};
+\draw[arr] (a.south) -- (g.north)
+           node[lbl, midway, right=6pt]{normalise advantages};
+%% Return arrow on the LEFT side, clear of all text
+\draw[arr] (g.west)  -- ++(-2.2,0)  coordinate (bl)
+           node[lbl, midway, yshift=-6pt]{no policy update};
+\draw[arr] (bl) -- ++(0, 6.6) -- (p.west);
 \end{tikzpicture}
-\caption{The zero-advantage fixed point in single-environment A2C. Once the critic converges to the bad policy's value function, advantages vanish and the policy gradient becomes zero. The actor loss CSV confirms this: mean actor loss reaches $0.000023$ by episode 600 and remains at $\approx 0$ for all 5,000 episodes.}
+\caption{The zero-advantage fixed point in single-environment A2C. Once the critic converges to the current bad policy's value function, advantages vanish, the policy gradient becomes zero, and the policy cannot improve. The actor loss in our experiments reaches $0.000023$ by episode 600 and remains at ${\approx}0$ for all 5,000 episodes.}
 \label{fig:ac_fixed_point}
 \end{figure}
 
