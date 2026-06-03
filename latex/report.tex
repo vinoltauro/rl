@@ -242,9 +242,16 @@ Q-Learning solves GridWorld in 3,000 episodes, achieving a 100\% goal rate in th
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.9\linewidth]{figures/gridworld_training.png}
-\caption{GridWorld Q-Learning training curves. \textit{Left}: per-episode reward with 50-episode moving average. \textit{Right}: steps to reach the goal (or timeout), showing rapid convergence to the near-optimal 10-step path.}
+\includegraphics[width=\linewidth]{figures/fig_gridworld_training.png}
+\caption{GridWorld Q-Learning training. (a)~Per-episode reward with 50-episode moving average, converging to the near-optimal score of 9. (b)~Steps to reach the goal, showing rapid convergence to the 10-step optimal path.}
 \label{fig:gridworld}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_gridworld_policy.png}
+\caption{GridWorld: learned value function and greedy policy after 3,000 training episodes. (a)~State value function $V(s) = \max_a Q(s,a)$; darkened cells are walls. High values appear along the shortest path to goal~G. (b)~Greedy policy $\pi(s) = \arg\max_a Q(s,a)$; arrows show the direction of maximum Q-value. Start state S is marked in blue.}
+\label{fig:gridworld_policy}
 \end{figure}
 
 \subsection{CartPole}
