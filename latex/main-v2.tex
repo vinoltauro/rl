@@ -226,7 +226,7 @@ All deep RL algorithms use fully-connected networks with orthogonal weight initi
 
 \begin{figure}[H]
 \centering
-\resizebox{\linewidth}{!}{%
+\resizebox{0.88\linewidth}{!}{%
 \begin{tikzpicture}[
   blk/.style={draw, rectangle, rounded corners=4pt,
               minimum width=2.0cm, minimum height=0.9cm,
@@ -553,7 +553,7 @@ Three issues combining to cause Q-value runaway in successive DQN runs:
 \begin{equation}
   \text{sum}(\mathbf{L} \cdot \mathbf{A}^T) = \sum_i \log\pi(a_i) \cdot \sum_j A_j = \mathbf{1}^T\mathbf{L} \cdot \mathbf{0} = 0
 \end{equation}
-Since normalised advantages have exactly zero mean ($\sum_j A_j = 0$), the policy loss was identically zero for every gradient update across all 5,000 episodes. Fix: \texttt{torch.stack(log\_probs).squeeze(-1)} to obtain shape \texttt{[T]}, then element-wise multiplication.
+Since normalised advantages have exactly zero mean ($\sum_j A_j = 0$), the policy loss was identically zero for every gradient update across all 5,000 episodes. Fix: call \texttt{torch.stack(log\_probs)\allowbreak.squeeze(-1)} to obtain shape \texttt{[T]}, then element-wise multiplication.
 
 \textbf{Issue \#24}: Full Monte Carlo returns over 200-step episodes create enormous variance in advantage estimates. Fix: GAE($\lambda=0.95$) reduces variance to the $\lambda$-weighted sum of TD errors.
 

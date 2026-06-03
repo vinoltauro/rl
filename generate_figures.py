@@ -377,7 +377,7 @@ bw = 0.38
 ax2.bar(x - bw/2, g2, bw, color=C['v2'],  label='v2', edgecolor='none', alpha=0.85)
 ax2.bar(x + bw/2, g5, bw, color=C['ppo'], label='v5', edgecolor='none', alpha=0.85)
 ax2.set_xticks(x)
-ax2.set_xticklabels([f'{i+1}K' for i in range(n)], rotation=45, fontsize=7.5)
+ax2.set_xticklabels([f'{i+1}K' for i in range(n)], rotation=45, fontsize=7.5, ha='right')
 ax2.set_xlabel('Episode window (×1,000)')
 ax2.set_ylabel('Goals reached')
 ax2.legend(fontsize=8)
